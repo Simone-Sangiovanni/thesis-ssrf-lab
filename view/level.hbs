@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+	<meta charset="UTF-8">
+	<title>SSRF Lab - {{levelName}}</title>
+	<link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+<div class="container">
+	<h1>SSRF - {{levelName}}</h1>
+	<div id="loading" style="margin: 20px 0;">
+		<div class="loading"></div> Loading...
+	</div>
+	<div id="output" style="margin-top:20px;"></div>
+
+	<p style="margin-top:30px;"><a href="/ssrf">← Back to menu</a></p>
+</div>
+
+
+
+<script>
+  const level = '{{level}}';
+
+  function loadData(fileurl) {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('output').innerHTML = '';
+
+    const apiUrl = `/ssrf/${level}/fetch?fileurl=${encodeURIComponent(fileurl)}`;
+    
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (data.isValid) {
+          let displayHtml = '';
+          try {
+            const parsed = JSON.parse(data.content);
+            displayHtml = `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+          } catch(e) {
+            displayHtml = `<pre>${data.content}</pre>`;
+          }
+          document.getElementById('output').innerHTML = displayHtml;
+        } else {
+          document.getElementById('output').innerHTML = `<div class="error"><strong>Error:</strong> ${data.content}</div>`;
+        }
+      })
+      .catch(err => {
+        document.getElementById('output').innerHTML = `<strong>Network error:</strong> ${err.message}`;
+      })
+      .finally(() => {
+        document.getElementById('loading').style.display = 'none';
+      });
+  }
+
+  let fileurl = "https://www.unimi.it/themes/custom/unimi/img/LogoHeader.svg";
+  
+  setTimeout(() => {
+    loadData(fileurl);
+  });
+</script>
+</body>
+</html>

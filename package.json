@@ -1,0 +1,9 @@
+{
+	"name": "ssrf-ctf",
+	"version": "1.0.0",
+	"dependencies": {
+		"express": "^4.18.2",
+		"hbs": "^4.0.0",
+		"ipaddr.js": "^2.2.0"
+	}
+}
