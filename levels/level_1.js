@@ -8,21 +8,21 @@ const urlUtils = require('../utils/url_utils.js');
 
 // TODO: understand, comment and refactor
 async function isLocalHost(hostname) {
-    if (ipaddr.isValid(hostname)) {
-        // Already an IP literal
-        return isPrivateIp(hostname);
-    }
-
-    let addresses = [];
     try {
-        const ipv4 = await dns.resolve4(hostname).catch(() => []);
-        const ipv6 = await dns.resolve6(hostname).catch(() => []);
-        addresses = [...ipv4, ...ipv6];
-    } catch {
-        return false; // DNS failure → assume safe
-    }
+        // dns.lookup con { all: true } interroga il sistema operativo (esattamente come fetch)
+        // Se "hostname" è già un IP, ritornerà quell'IP.
+        // Se è un dominio, ritornerà TUTTI gli IP (IPv4 e IPv6) a cui punta.
+        const addresses = await dns.lookup(hostname, { all: true });
 
-    return addresses.some(ip => isPrivateIp(ip));
+        // Controlliamo se ALMENO UNO degli IP risolti è privato/locale
+        return addresses.some(record => isPrivateIp(record.address));
+
+    } catch (error) {
+        // FAIL CLOSED: Se la risoluzione fallisce (es. host non esiste, timeout DNS),
+        // assumiamo che sia pericoloso e blocchiamo. Questo evita bypass imprevisti.
+        console.warn(`[SSRF Guard] DNS resolution failed for ${hostname}:`, error.message);
+        return true; // Ritorna true per indicare "Sì, bloccalo"
+    }
 }
 
 // TODO: understand, comment and refactor
@@ -97,35 +97,50 @@ async function fileScheme_readFile(pathname, whitelist){
  * @returns {boolean}: true if the element is present inside the congiguration, false otherwhise
  */
 function check(element, config) {
-    // TODO
+    // TODO: move here the checks on the url
 }
 
 // TODO: add docstrings and comments
 async function httpScheme_fetch(parsed_url, config) {
+    // TODO: block the url "http://127.0.0.1/flags/level_1" in level_1: the user must be ablo to read the content of /flags folder and the rest, 
+    // but shold not be able to read the file using the http protocol. https is not implemented for the internal server so there is no need to 
+    // protect against it
+    const parsed_authority = urlUtils.parseAuthority(parsed_url.authority);
+    console.log("\nparsed authority: " + JSON.stringify(parsed_authority));
+
+    let hostToCheck = parsed_authority.host;
+
     if (config.doubleEncoding) {
         // execute checks on host here
         // checks are done before decoding the host
         // this is the vulnerable part
+        hostToCheck = parsed_authority.host;
     } else {
         // if the level is not vulnerable to double encoding
         // checks are executed after the decoding
+        hostToCheck = decodeURIComponent(parsed_authority.host);
     }
-    const parsed_authority = urlUtils.parseAuthority(parsed_url.authority);
-    console.log("parsed authority: " + JSON.stringify(parsed_authority));
+    
+    // Host blacklist check
+    if (config.hostBlacklist.includes(hostToCheck) && config.hostBlacklist.length > 0) {
+        console.log("\nHost in blacklist");
+        throw new Error(`Host "${hostToCheck}" is blacklisted.`);
+    }
 
-    // Host whitelist
-    if (config.host.length && !config.host.includes(parsed_url.host)) {
-        throw new Error(`Host "${parsed_url.host}" not allowed.`);
+    // Host whitelist check (only if it contain elements)
+    if (config.hostWhitelist.length > 0) {
+        if (!config.hostWhitelist.includes(hostToCheck)) {
+            console.log("\nHost not allowed by whitelist");
+            throw new Error(`Host "${hostToCheck}" not allowed.`);
+        }
     }
-    // Port check
-    if (config.port.length && !config.port.includes(parsed_url.port || '')) {
-        throw new Error(`Port "${parsed_url.port}" not allowed.`);
-    }
+
     // SSRF guard: block local / private hosts
-    const local = await isLocalHost(parsed_url.host);
-    if (local) {
-        throw new Error(`Access to local/internal host "${parsed_url.host}" is blocked.`);
-    }
+    // const local = await isLocalHost(parsed_authority.host);
+    // if (local) {
+    //     console.log("\nLocal ip: blocked")
+    //     throw new Error(`Access to local/internal host "${parsed_authority.host}" is blocked.`);
+    // }
 
     const fullUrl = `${parsed_url.scheme}://${parsed_url.authority}${parsed_url.path}${parsed_url.query ? '?' + parsed_url.query : ''}`;
     const response = await fetch(fullUrl);
@@ -140,12 +155,11 @@ async function httpScheme_fetch(parsed_url, config) {
  */
 async function handleURL(url) {
     // get the config for the level
-    console.log("url: " + url);
+    console.log("\nurl: " + url);
     const config = configUtils.parseConfig("level_1");
-    console.log("step 1");
     // parse the url and get an object
     const parsed_url = urlUtils.RFC3986_URLParser(url);
-    console.log("parsed_url url: " + JSON.stringify(parsed_url));
+    console.log("\nparsed_url url: " + JSON.stringify(parsed_url));
 
     // if the protocol is not allowed throw an error
     if (!checkProtocol(parsed_url.scheme, config.protocol)) {
@@ -154,7 +168,7 @@ async function handleURL(url) {
 
     switch (parsed_url.scheme) {
         case "file":
-            return await fileScheme_readFile(parsed_url.path, config.whitelist);
+            return await fileScheme_readFile(parsed_url.path, config.fileWhitelist);
             break;
         case "http":
         case "https":

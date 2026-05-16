@@ -4,11 +4,13 @@
         "https",
         "file"
     ],
-    "host": [],
-    "port": [],
-    "whitelist": [
+    "hostWhitelist": [],
+    "hostBlacklist": [],
+    "portWhitelist": [],
+    "portBlacklist": [],
+    "fileWhitelist": [
         "/flags/level_1"
     ],
-    "blacklist": [],
+    "fileBlacklist": [],
     "doubleEncoding": false
 }

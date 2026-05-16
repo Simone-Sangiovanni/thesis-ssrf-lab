@@ -13,10 +13,12 @@ function parseConfig(level) {
     // default config object
     let config = {
         protocol: [],
-        host: [],
-        port: [],
-        whitelist: [],
-        blacklist: [],
+        hostWhitelist: [],
+        hostBlacklist: [],
+        portWhitelist: [],
+        portBlacklist: [],
+        fileWhitelist: [],
+        fileBlacklist: [],
         doubleEncoding: false
     };
 
