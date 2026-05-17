@@ -1,3 +1,1 @@
-{
-        "level_3": "flag_{buffer_overflow}"
-}
+flag{buffer_overflow}
