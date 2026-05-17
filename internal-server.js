@@ -2,67 +2,54 @@ const express = require('express');
 const path = require('path');
 const app = express();
 const fs = require('fs').promises;
+const misc = require('./utils/miscellaneous');
 const PORT = 80;
+
+// list of the valid levels: ["level_1", "level_2", ...]
+const VALID_LEVELS = misc.getValidLevels();
  
-// Accetta solo connessioni da localhost
+// Accetta solo connessioni da in cui l'host è 127.0.0.1
 app.use((req, res, next) => {
     const ip = req.socket.remoteAddress;
-    const isLocal = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip);
+    const isLocal = ['127.0.0.1'].includes(ip);
     if (!isLocal) {
         return res.status(403).json({ error: 'Forbidden: internal service only' });
     }
     next();
 });
 
-
+// internal API gateway
 app.get('/', async (req, res) => {
     const entries = await fs.readdir('/');
     res.json({
-        service: 'Internal API Gateway',
-        version: '1.0.0',
         endpoints: entries,
     });
 });
 
 
-app.get('*', async (req, res) => {
-    // req.path contiene l'intero percorso, es. '/flags/level_2'
-    const requested = req.path.substring(1);  // rimuovi lo slash iniziale
+app.use(async (req, res) => {
+    const level = req.headers['x-current-level'];
+    console.log("\n level: " + level);    
+    console.log("\n path " + req.path);
+    const requested = req.path.substring(1);
+    console.log("\n requested: " + requested);
     const fullPath = path.resolve('/', requested);
+    console.log("\n fullPath: " + fullPath);
+
     
-    console.log("full path: " + fullPath);
-
-    // Basic path safety check
-    if (!fullPath.startsWith('/')) {
-        return res.status(400).json({ error: 'Invalid path' });
+    // Reject if header is missing or invalid
+    if (!level || !VALID_LEVELS.includes(level)) {
+        return res.status(403).json({ error: 'Missing or invalid X-Current-Level header' });
     }
-
+    
+    // Construct the flag file path (adjust if your flags are named differently)
+    const flagPath = `/flags/${level}`;   // e.g., /flags/level_1
+    
     try {
-        const stats = await fs.stat(fullPath);
-        if (stats.isDirectory()) {
-            const entries = await fs.readdir(fullPath);
-            return res.json({
-                path: fullPath,
-                type: 'directory',
-                contents: entries
-            });
-        } else if (stats.isFile()) {
-            let content = await fs.readFile(fullPath, "utf8")
-            console.log("file: " + content)
-            return res.send(content);
-        } else {
-            // Symlinks, devices, etc.
-            return res.status(400).json({
-                error: 'Path is not a regular directory or file',
-                path: fullPath
-            });
-        }
+        const content = await fs.readFile(flagPath, 'utf8');
+        res.send(content);
     } catch (err) {
-        // File not found, permission denied, etc.
-        return res.status(404).json({
-            error: 'Not found or cannot access',
-            path: fullPath
-        });
+        res.status(404).json({ error: `Flag for ${level} not found` });
     }
 });
 
