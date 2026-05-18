@@ -92,24 +92,29 @@ async function fileScheme_readFile(pathname, whitelist){
 
 /**
  * Execute checks on the element passed. Verify if the element is present inside the configuration
- * @param {*} element: the element to check 
+ * @param {*} authority: the element to check: it is an object containing username, password, host and port
  * @param {list} config: the configuration
  * @returns {boolean}: true if the element is present inside the congiguration, false otherwhise
  */
-function check(element, config) {
+function check(authority, config) {
+    let is_ok = true;
     // Host blacklist check
-    if (config.hostBlacklist.includes(element) && config.hostBlacklist.length > 0) {
+    if (config.hostBlacklist.includes(authority.host) && config.hostBlacklist.length > 0) {
         console.log("\nHost in blacklist");
-        throw new Error(`Host "${element}" is blacklisted.`);
+        is_ok = false;
+        throw new Error(`Host "${authority.host}" is blacklisted.`);
     }
 
     // Host whitelist check (only if it contain elements)
     if (config.hostWhitelist.length > 0) {
-        if (!config.hostWhitelist.includes(element)) {
+        if (!config.hostWhitelist.includes(authority.host)) {
             console.log("\nHost not allowed by whitelist");
-            throw new Error(`Host "${element}" not allowed.`);
+            is_ok = false;
+            throw new Error(`Host "${authority.host}" not allowed.`);
         }
     }
+
+    return is_ok;
 }
 
 // TODO: add docstrings and comments
@@ -117,23 +122,17 @@ async function httpScheme_fetch(parsed_url, config, level) {
     // TODO: block the url "http://127.0.0.1/flags/level_1" in level_1: the user must be ablo to read the content of /flags folder and the rest, 
     // but shold not be able to read the file using the http protocol. https is not implemented for the internal server so there is no need to 
     // protect against it
-    const parsed_authority = urlUtils.parseAuthority(parsed_url.authority);
+    let parsed_authority = urlUtils.parseAuthority(parsed_url.authority);
     console.log("\nparsed authority: " + JSON.stringify(parsed_authority));
 
-    let hostToCheck = parsed_authority.host;
-
-    if (config.doubleEncoding) {
-        // execute checks on host here
-        // checks are done before decoding the host
-        // this is the vulnerable part
-        hostToCheck = parsed_authority.host;
-    } else {
+    if (!config.doubleEncoding) {
         // if the level is not vulnerable to double encoding
         // checks are executed after the decoding
-        hostToCheck = decodeURIComponent(parsed_authority.host);
+        const decoded = decodeURIComponent(parsed_url);
+        parsed_authority = urlUtils.parseAuthority(decoded);
     }
 
-    check(hostToCheck, config);
+    check(parsed_authority, config);
 
     // SSRF guard: block local / private hosts
     // const local = await isLocalHost(parsed_authority.host);
@@ -145,6 +144,7 @@ async function httpScheme_fetch(parsed_url, config, level) {
     // TODO: do I need this?
     // parsed_authority.host = decodeURIComponent(parsed_authority.host);
 
+    // rebuild the url for fetch
     const fullUrl = `${parsed_url.scheme}://${parsed_url.authority}${parsed_url.path}${parsed_url.query ? '?' + parsed_url.query : ''}`;
     // Prepare fetch options
     const fetchOptions = {};
@@ -156,7 +156,10 @@ async function httpScheme_fetch(parsed_url, config, level) {
         };
     }
     const response = await fetch(fullUrl, fetchOptions);
-    if (!response.ok) throw new Error(`HTTP fetch failed: ${response.status}`);
+    if (!response.ok) {
+        let errorDetail = await response.text();
+        throw new Error(`${errorDetail}`);
+    }
     return await response.text();
 }
 
