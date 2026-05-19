@@ -158,31 +158,20 @@ function validateAuthority(authority, config) {
  * @throws {Error} - If validation fails, request fails, or response is not OK.
  */
 async function httpScheme_fetch(parsedUrl, config, level) {
+    // If double‑encoding protection is disabled for this level,
+    // the URL may have been double‑encoded. Decode once before checking.
+    if (!config.doubleEncoding) {
+        console.log("[httpScheme_fetch] inside the if");
+        const decodedUrl = decodeURIComponent(parsedUrl.authority);
+        console.log("[httpScheme_fetch] decodedUrl: " + JSON.stringify(decodedUrl));
+        parsedUrl.authority = decodedUrl;
+    } 
     // Parse the authority (username:password@host:port)
     let authority = urlUtils.parseAuthority(parsedUrl.authority);
     console.log(`[httpScheme_fetch] Parsed authority: ${JSON.stringify(authority)}`);
 
-    // If double‑encoding protection is disabled for this level,
-    // the URL may have been double‑encoded. Decode once before checking.
-    if (!config.doubleEncoding) {
-        const decodedUrl = decodeURIComponent(parsedUrl);
-        // Re‑parse the authority from the decoded URL
-        authority = urlUtils.parseAuthority(decodedUrl);
-    }
-
     // Validate host against blacklist/whitelist
     validateAuthority(authority, config);
-
-    // ===== SSRF Guard =====
-    // The following code would block any request to local/private hosts.
-    // It is commented out to allow the lab to work as originally designed.
-    /*
-    const isLocal = await isLocalHost(authority.host);
-    if (isLocal) {
-        console.log("[httpScheme_fetch] Local IP blocked");
-        throw new Error(`Access to local/internal host "${authority.host}" is blocked.`);
-    }
-    */
 
     // Rebuild the full URL for fetch
     const fullUrl = `${parsedUrl.scheme}://${parsedUrl.authority}${parsedUrl.path}${parsedUrl.query ? '?' + parsedUrl.query : ''}`;
@@ -238,10 +227,6 @@ async function handleURL(url, level) {
         case 'http':
         case 'https':
             return await httpScheme_fetch(parsedUrl, config, level);
-        default:
-            // This should never happen because protocol was already validated,
-            // but we keep it as a safety net.
-            throw new Error(`Unsupported scheme: "${parsedUrl.scheme}"`);
     }
 }
 
