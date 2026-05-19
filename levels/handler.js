@@ -6,191 +6,243 @@ const dns = require('dns').promises;
 const configUtils = require('../utils/config_utils.js');
 const urlUtils = require('../utils/url_utils.js');
 
-// TODO: understand, comment and refactor
+// ======================== Helper Functions ========================
+
+/**
+ * Checks if a hostname resolves to any private/local IP address.
+ * Used as an SSRF guard to block localhost / internal network access.
+ *
+ * @param {string} hostname - Domain name or IP address.
+ * @returns {Promise<boolean>} - True if the host is local/private (block), false otherwise.
+ */
 async function isLocalHost(hostname) {
     try {
-        // dns.lookup con { all: true } interroga il sistema operativo (esattamente come fetch)
-        // Se "hostname" è già un IP, ritornerà quell'IP.
-        // Se è un dominio, ritornerà TUTTI gli IP (IPv4 e IPv6) a cui punta.
+        // dns.lookup with { all: true } queries the OS (exactly like fetch would).
+        // If hostname is an IP, it returns that IP.
+        // If it's a domain, it returns ALL resolved IP addresses (IPv4 and IPv6).
         const addresses = await dns.lookup(hostname, { all: true });
 
-        // Controlliamo se ALMENO UNO degli IP risolti è privato/locale
+        // If ANY resolved address is private/local, treat the host as local.
         return addresses.some(record => isPrivateIp(record.address));
-
     } catch (error) {
-        // FAIL CLOSED: Se la risoluzione fallisce (es. host non esiste, timeout DNS),
-        // assumiamo che sia pericoloso e blocchiamo. Questo evita bypass imprevisti.
+        // FAIL CLOSED: If DNS resolution fails (e.g., host doesn't exist, timeout),
+        // assume it's dangerous and block. This prevents unexpected bypasses.
         console.warn(`[SSRF Guard] DNS resolution failed for ${hostname}:`, error.message);
-        return true; // Ritorna true per indicare "Sì, bloccalo"
+        return true; // Return true to indicate "yes, block it"
     }
 }
 
-// TODO: understand, comment and refactor
+/**
+ * Determines whether an IP address is private, loopback, link-local, or unspecified.
+ * Supports both IPv4 and IPv6, including IPv4-mapped IPv6 addresses.
+ *
+ * @param {string} ip - The IP address as a string.
+ * @returns {boolean} - True if the IP is considered local/private.
+ */
 function isPrivateIp(ip) {
     try {
         const addr = ipaddr.parse(ip);
         if (addr.kind() === 'ipv4') {
-            const r = addr.range();
-            return r === 'private' || r === 'loopback' || r === 'linkLocal' || r === 'unspecified';
+            const range = addr.range();
+            return range === 'private' ||
+                   range === 'loopback' ||
+                   range === 'linkLocal' ||
+                   range === 'unspecified';
         }
         if (addr.kind() === 'ipv6') {
             // IPv4-mapped IPv6 (e.g., ::ffff:192.168.1.1)
             if (addr.isIPv4MappedAddress()) {
                 const ipv4 = addr.toIPv4Address();
-                const r = ipv4.range();
-                return r === 'private' || r === 'loopback' || r === 'linkLocal' || r === 'unspecified';
+                const range = ipv4.range();
+                return range === 'private' ||
+                       range === 'loopback' ||
+                       range === 'linkLocal' ||
+                       range === 'unspecified';
             }
-            const r = addr.range();
-            return r === 'loopback' || r === 'linkLocal' || r === 'uniqueLocal';
+            const range = addr.range();
+            return range === 'loopback' ||
+                   range === 'linkLocal' ||
+                   range === 'uniqueLocal';   // IPv6 unique local addresses (ULA)
         }
     } catch {
-        // invalid IP string → not a local IP
+        // Invalid IP string → not a local IP
     }
     return false;
 }
 
 /**
- * Check if the protocol is allowed or not, the check is made on top of the configuration file
- * @param {string} protocol: protocol used inside the url 
- * @param {list} allowed: list of the allowed protocols
- * @returns {boolean}: true if the protocol is allowed, false otherwhise
+ * Checks if a given protocol is allowed by the level configuration.
+ *
+ * @param {string} protocol - The protocol name (e.g., 'http', 'file').
+ * @param {string[]} allowedProtocols - List of allowed protocols.
+ * @returns {boolean} - True if allowed, false otherwise.
  */
-function checkProtocol(protocol, allowed) {
-    return allowed.includes(protocol)
+function isProtocolAllowed(protocol, allowedProtocols) {
+    return allowedProtocols.includes(protocol);
 }
 
 /**
- * Use a path to read its content.
- * If the path is a directory list the content and return it.
- * If the path is a whitelisted file return it's content
- * If the file is not allowed throw an error
- * @param {string} pathname: pathname of the file to read 
- * @param {list} whitelist: list of the allowed files to read 
- * @returns {Promise<any>}: a promise that resolves in a file content if the file is allowed, or the content of the directory if pathname is a directory
- * @throws {Error}: if the file is not in the whitelist
+ * Reads a file or directory using the file:// scheme, respecting a whitelist for files.
+ * Directories are always readable (returns a JSON list of contents).
+ * Files are only readable if their absolute normalized path is in the whitelist.
+ *
+ * @param {string} pathname - The path part of the file:// URL.
+ * @param {string[]} whitelist - List of absolute file paths that are allowed.
+ * @returns {Promise<string>} - File content (UTF-8) or directory listing (JSON).
+ * @throws {Error} - If the path does not exist, is neither file nor directory,
+ *                   or if a file is not whitelisted.
  */
-// TODO: if the folder does not exists throw an error, now this case is not handled
-// TODO: if the pathname is not a file nor a directory throw an error, now this case is not managed
-async function fileScheme_readFile(pathname, whitelist){
-    const normalized = path.normalize(pathname); // expand . and .. into a full path
-    const stat = await fs.stat(normalized); // get info about the path: directory or file
-    if (stat.isDirectory()) {
-        // Directory request → return contents as JSON
-        const entries = await fs.readdir(normalized);
+async function fileScheme_readFile(pathname, whitelist) {
+    // Normalize the path to resolve '.' and '..' and ensure absolute consistency
+    const normalizedPath = path.normalize(pathname);
+
+    let stats;
+    try {
+        stats = await fs.stat(normalizedPath);
+    } catch (err) {
+        // If the file/directory does not exist, re-throw a clear error
+        throw new Error(`Cannot access path "${normalizedPath}": ${err.message}`);
+    }
+
+    if (stats.isDirectory()) {
+        // Directory listing: return JSON with the directory path and its entries
+        const entries = await fs.readdir(normalizedPath);
         return JSON.stringify({
-            directory: normalized,
+            directory: normalizedPath,
             contents: entries
         }, null, 2);
-    } else {
-        if (whitelist.includes(normalized)) {
-            return await fs.readFile(normalized, 'utf8');
+    } else if (stats.isFile()) {
+        // File access: must be explicitly whitelisted
+        if (whitelist.includes(normalizedPath)) {
+            return await fs.readFile(normalizedPath, 'utf8');
         } else {
-            throw new Error(`Access denied. Path "${normalized}" is not allowed.`);
+            throw new Error(`Access denied. Path "${normalizedPath}" is not allowed.`);
         }
+    } else {
+        // Neither file nor directory (e.g., device, socket, etc.)
+        throw new Error(`Path "${normalizedPath}" is not a regular file or directory.`);
     }
 }
 
 /**
- * Execute checks on the element passed. Verify if the element is present inside the configuration
- * @param {*} authority: the element to check: it is an object containing username, password, host and port
- * @param {list} config: the configuration
- * @returns {boolean}: true if the element is present inside the congiguration, false otherwhise
+ * Validates the authority component (host) against blacklist and whitelist.
+ * Blacklist takes precedence: if host is blacklisted, an error is thrown immediately.
+ * If a whitelist is non‑empty, the host must be present in it.
+ *
+ * @param {Object} authority - Parsed authority object (username, password, host, port).
+ * @param {Object} config - Level configuration (contains hostBlacklist, hostWhitelist).
+ * @throws {Error} - If host is blacklisted or not whitelisted (when whitelist is non‑empty).
  */
-function check(authority, config) {
-    let is_ok = true;
-    // Host blacklist check
-    if (config.hostBlacklist.includes(authority.host) && config.hostBlacklist.length > 0) {
-        console.log("\nHost in blacklist");
-        is_ok = false;
+function validateAuthority(authority, config) {
+    // Blacklist check (if blacklist is non‑empty and contains the host)
+    if (config.hostBlacklist.length > 0 && config.hostBlacklist.includes(authority.host)) {
+        console.log("[validateAuthority] Host in blacklist");
         throw new Error(`Host "${authority.host}" is blacklisted.`);
     }
 
-    // Host whitelist check (only if it contain elements)
-    if (config.hostWhitelist.length > 0) {
-        if (!config.hostWhitelist.includes(authority.host)) {
-            console.log("\nHost not allowed by whitelist");
-            is_ok = false;
-            throw new Error(`Host "${authority.host}" not allowed.`);
-        }
+    // Whitelist check (only if whitelist is non‑empty)
+    if (config.hostWhitelist.length > 0 && !config.hostWhitelist.includes(authority.host)) {
+        console.log("[validateAuthority] Host not allowed by whitelist");
+        throw new Error(`Host "${authority.host}" not allowed.`);
     }
-
-    return is_ok;
 }
 
-// TODO: add docstrings and comments
-async function httpScheme_fetch(parsed_url, config, level) {
-    // TODO: block the url "http://127.0.0.1/flags/level_1" in level_1: the user must be ablo to read the content of /flags folder and the rest, 
-    // but shold not be able to read the file using the http protocol. https is not implemented for the internal server so there is no need to 
-    // protect against it
-    let parsed_authority = urlUtils.parseAuthority(parsed_url.authority);
-    console.log("\nparsed authority: " + JSON.stringify(parsed_authority));
+/**
+ * Performs an HTTP/HTTPS request using the fetch API, respecting level configuration.
+ * Applies double‑encoding handling, authority validation, and an optional localhost guard.
+ *
+ * @param {Object} parsedUrl - RFC3986 parsed URL object.
+ * @param {Object} config - Level configuration (protocols, whitelists, doubleEncoding).
+ * @param {string} level - Current level identifier (used for internal server header).
+ * @returns {Promise<string>} - Response body as text.
+ * @throws {Error} - If validation fails, request fails, or response is not OK.
+ */
+async function httpScheme_fetch(parsedUrl, config, level) {
+    // Parse the authority (username:password@host:port)
+    let authority = urlUtils.parseAuthority(parsedUrl.authority);
+    console.log(`[httpScheme_fetch] Parsed authority: ${JSON.stringify(authority)}`);
 
+    // If double‑encoding protection is disabled for this level,
+    // the URL may have been double‑encoded. Decode once before checking.
     if (!config.doubleEncoding) {
-        // if the level is not vulnerable to double encoding
-        // checks are executed after the decoding
-        const decoded = decodeURIComponent(parsed_url);
-        parsed_authority = urlUtils.parseAuthority(decoded);
+        const decodedUrl = decodeURIComponent(parsedUrl);
+        // Re‑parse the authority from the decoded URL
+        authority = urlUtils.parseAuthority(decodedUrl);
     }
 
-    check(parsed_authority, config);
+    // Validate host against blacklist/whitelist
+    validateAuthority(authority, config);
 
-    // SSRF guard: block local / private hosts
-    // const local = await isLocalHost(parsed_authority.host);
-    // if (local) {
-    //     console.log("\nLocal ip: blocked")
-    //     throw new Error(`Access to local/internal host "${parsed_authority.host}" is blocked.`);
-    // }
+    // ===== SSRF Guard =====
+    // The following code would block any request to local/private hosts.
+    // It is commented out to allow the lab to work as originally designed.
+    /*
+    const isLocal = await isLocalHost(authority.host);
+    if (isLocal) {
+        console.log("[httpScheme_fetch] Local IP blocked");
+        throw new Error(`Access to local/internal host "${authority.host}" is blocked.`);
+    }
+    */
 
-    // TODO: do I need this?
-    // parsed_authority.host = decodeURIComponent(parsed_authority.host);
+    // Rebuild the full URL for fetch
+    const fullUrl = `${parsedUrl.scheme}://${parsedUrl.authority}${parsedUrl.path}${parsedUrl.query ? '?' + parsedUrl.query : ''}`;
 
-    // rebuild the url for fetch
-    const fullUrl = `${parsed_url.scheme}://${parsed_url.authority}${parsed_url.path}${parsed_url.query ? '?' + parsed_url.query : ''}`;
     // Prepare fetch options
     const fetchOptions = {};
-    // If the target is the internal server (localhost), add the level header
-    const targetHost = parsed_authority.host;
-    if (targetHost === '127.0.0.1') {
+
+    // If the target is the internal server (127.0.0.1), add a header with the current level.
+    if (authority.host === '127.0.0.1') {
         fetchOptions.headers = {
             'X-Current-Level': level
         };
     }
+
     const response = await fetch(fullUrl, fetchOptions);
     if (!response.ok) {
-        let errorDetail = await response.text();
-        throw new Error(`${errorDetail}`);
+        const errorDetail = await response.text();
+        throw new Error(errorDetail);
     }
     return await response.text();
 }
 
+// ======================== Exported Function ========================
+
 /**
- * Main function
- * @param {string} url: vulnerable url. It is the payload 
- * @returns {Promise<any>}: a promise that resolves to a flag
+ * Main SSRF handler. Processes a user‑supplied URL according to the rules
+ * defined for a specific level.
+ *
+ * @param {string} url - The full URL (payload) to process.
+ * @param {string} level - The level identifier (e.g., "level_1").
+ * @returns {Promise<string>} - The result (file content, HTTP response, etc.).
+ * @throws {Error} - If the URL scheme is not allowed, config missing, or any validation fails.
  */
 async function handleURL(url, level) {
-    // get the config for the level
-    console.log("\nurl: " + url);
+    console.log(`[handleURL] Input URL: ${url}`);
+
+    // Load the level configuration
     const config = configUtils.parseConfig(level);
-    // parse the url and get an object
-    const parsed_url = urlUtils.RFC3986_URLParser(url);
-    console.log("\nparsed_url url: " + JSON.stringify(parsed_url));
 
-    // if the protocol is not allowed throw an error
-    if (!checkProtocol(parsed_url.scheme, config.protocol)) {
-        throw new Error(`Protocol "${parsed_url.scheme}" is not allowed.`);
-    } 
+    // Parse the URL according to RFC 3986
+    const parsedUrl = urlUtils.RFC3986_URLParser(url);
+    console.log(`[handleURL] Parsed URL: ${JSON.stringify(parsedUrl)}`);
 
-    switch (parsed_url.scheme) {
-        case "file":
-            return await fileScheme_readFile(parsed_url.path, config.fileWhitelist);
-            break;
-        case "http":
-        case "https":
-            return await httpScheme_fetch(parsed_url, config, level)
-            break;
+    // 1. Check if the protocol is allowed
+    if (!isProtocolAllowed(parsedUrl.scheme, config.protocol)) {
+        throw new Error(`Protocol "${parsedUrl.scheme}" is not allowed.`);
+    }
+
+    // 2. Dispatch to the appropriate handler based on the scheme
+    switch (parsedUrl.scheme) {
+        case 'file':
+            return await fileScheme_readFile(parsedUrl.path, config.fileWhitelist);
+        case 'http':
+        case 'https':
+            return await httpScheme_fetch(parsedUrl, config, level);
+        default:
+            // This should never happen because protocol was already validated,
+            // but we keep it as a safety net.
+            throw new Error(`Unsupported scheme: "${parsedUrl.scheme}"`);
     }
 }
 
-// exports the handleURL function so it can be used by other modules
 module.exports = { handleURL };
