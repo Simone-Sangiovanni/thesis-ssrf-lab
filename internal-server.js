@@ -1,9 +1,12 @@
 const express = require('express');
 const path = require('path');
-const app = express();
+const http = require('http');
 const fs = require('fs').promises;
+
 const misc = require('./utils/miscellaneous');
 const PORT = 80;
+
+const app = express();
 
 // list of the valid levels: ["level_1", "level_2", ...]
 const VALID_LEVELS = misc.getValidLevels();
@@ -11,6 +14,7 @@ const VALID_LEVELS = misc.getValidLevels();
 // Accept only local requests
 app.use((req, res, next) => {
     const ip = req.socket.remoteAddress;   // Get client IP from the raw socket
+    console.log("\nip: " + ip);
     const isLocal = ['127.0.0.1', '::1'].includes(ip); // Check if IP is exactly 127.0.0.1
     if (!isLocal) {
         return res.status(403).send({ error: 'IP blocked' }); // Reject non-local
@@ -61,6 +65,14 @@ app.use(async (req, res) => {
 });
 
 
+// create 2 servers that shares the same backend. One that listen to the ipv4 interface and the other to the ipv6 interface
+const server4 = http.createServer(app);
+const server6 = http.createServer(app);
+
 app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Internal Service started`);
+    console.log(`✅ Server IPv4 in ascolto su http://127.0.0.1:${PORT}`);
+});
+
+app.listen(PORT, '::1', () => {
+    console.log(`✅ Server IPv6 in ascolto su http://[::1]:${PORT}`);
 });
