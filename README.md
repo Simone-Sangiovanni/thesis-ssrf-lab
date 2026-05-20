@@ -24,7 +24,7 @@ dove `x` è il numero del livello
 La struttura del file di configurazione è la seguente:
 ```json
 {
-    "protocol": [],
+	"protocol": [],
     "hostWhitelist": [],
     "hostBlacklist": [],
     "portWhitelist": [],
@@ -35,7 +35,7 @@ La struttura del file di configurazione è la seguente:
 }
 ```
 - **protocol**: lista di protocolli supportati, ad esempio http, https, file, gopher...
-- **doubleEncoding**: valore booleano (true, false). Serve se il livello è vulnerabile a double URL encoding:
+- **doubleEncoding**: valore booleano (true, false). Serve a definire se il livello è vulnerabile a double URL encoding:
 	  - true: il livello è vulnerabile
 	  - false: il livello non è vulnerabile
 # File delle flag
