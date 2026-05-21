@@ -32,6 +32,7 @@ function isProtocolAllowed(protocol, allowedProtocols) {
 async function fileScheme_readFile(pathname, whitelist) {
     // Normalize the path to resolve '.' and '..' and ensure absolute consistency
     const normalizedPath = path.normalize(pathname);
+    console.log("\nnormalized path: " + normalizedPath);
 
     let stats;
     try {
@@ -108,10 +109,9 @@ async function httpScheme_fetch(parsedUrl, config, level) {
     let authority = urlUtils.parseAuthority(parsedUrl.authority);
     console.log(`\n[httpScheme_fetch] Parsed authority: ${JSON.stringify(authority)}`);
 
+    // Vulnerable part: decode before validation
     // Validate autority against blacklist/whitelist
     validateAuthority(authority, config);
-
-    // Vulnerable part: decode after validation
     const decodedAuthority = decodeURIComponent(parsedUrl.authority);
     parsedUrl.authority = decodedAuthority;
     authority = urlUtils.parseAuthority(parsedUrl.authority);
@@ -178,8 +178,90 @@ async function handleURL(url, level) {
             return await fileScheme_readFile(parsedUrl.path, config.fileWhitelist);
         case 'http':
         case 'https':
-            return await httpScheme_fetch(parsedUrl, config, level);
+            return await httpScheme_fetch3(parsedUrl, config, level);
     }
 }
 
 module.exports = { handleURL };
+
+
+
+
+async function httpScheme_fetch2(parsedUrl, config, level) {
+    // decode
+    const decodedAuthority = decodeURIComponent(parsedUrl.authority);
+    console.log(`\n decodedAuthority: ${decodedAuthority}`);
+
+    // resolve
+    const authority = urlUtils.parseAuthority(decodedAuthority);
+    console.log(`\n authority: ${JSON.stringify(authority)}`);
+    const resolvedHost = await ip.resolveHost(authority.host);
+    console.log(`\n resolved host: ${JSON.stringify(resolvedHost)}`);
+    authority.host = resolvedHost.address;
+    console.log(`\n authority: ${JSON.stringify(authority)}`);
+
+    // check
+    validateAuthority(authority, config);
+
+    //rebuild
+    const fullUrl = `${parsedUrl.scheme}://${decodedAuthority}${parsedUrl.path}${parsedUrl.query ? '?' + parsedUrl.query : ''}`;
+    console.log(`\n fullurl: ${fullUrl}`);
+    const fetchOptions = {};
+    if (ip.isLoopback(authority.host)) {
+        fetchOptions.headers = {
+            'X-Current-Level': level
+        };
+    }
+
+    // fetch
+    const response = await fetch(fullUrl, fetchOptions);
+    if (!response.ok) {
+        const errorDetail = await response.text();
+        throw new Error(errorDetail);
+    }
+    return await response.text();
+}
+
+
+
+
+async function httpScheme_fetch3(parsedUrl, config, level) {
+    if(!config.doubleEncoding) {
+        // decode
+        const decodedAuthority = decodeURIComponent(parsedUrl.authority);
+        console.log(`\n decodedAuthority: ${decodedAuthority}`);
+        parsedUrl.authority = decodedAuthority;
+    }
+    
+    const authority = urlUtils.parseAuthority(parsedUrl.authority);
+    console.log(`\n authority: ${JSON.stringify(authority)}`);
+
+    // check
+    validateAuthority(authority, config);
+
+    parsedUrl.authority = decodeURIComponent(authority.host);
+    console.log(`\n decoded authority: ${parsedUrl.authority}`);
+
+    // resolve
+    const result = parsedUrl.authority.replace(/[\[\]]/g, '');
+    const resolvedHost = await ip.resolveHost(result);
+    authority.host = resolvedHost.address;
+
+    //rebuild
+    const fullUrl = `${parsedUrl.scheme}://${parsedUrl.authority}${parsedUrl.path}${parsedUrl.query ? '?' + parsedUrl.query : ''}`;
+    console.log(`\n fullurl: ${fullUrl}`);
+    const fetchOptions = {};
+    if (ip.isLoopback(authority.host)) {
+        fetchOptions.headers = {
+            'X-Current-Level': level
+        };
+    }
+
+    // fetch
+    const response = await fetch(fullUrl, fetchOptions);
+    if (!response.ok) {
+        const errorDetail = await response.text();
+        throw new Error(errorDetail);
+    }
+    return await response.text();
+}
