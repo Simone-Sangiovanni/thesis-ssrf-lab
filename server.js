@@ -1,14 +1,18 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { fork } = require('child_process');
-const levelHandler = require('./levels/handler');
+
+const levelHandler = require('./new_structure/handler');
 const misc = require('./utils/miscellaneous');
+const { loadConfig } = require('./new_structure/utils/config_utils');
+const InternalServer = require('./internal-server-manager');
+
 
 // ------------------- Configuration -------------------
 const PORT = process.env.PORT || 3000;
 const VIEWS_DIR = path.join(__dirname, 'view');
 const INTERNAL_SERVER_SCRIPT = path.join(__dirname, 'internal-server.js');
+
 
 // ------------------- Helper Functions -------------------
 /**
@@ -32,31 +36,6 @@ const isValidLevel = (levelId) => {
     return validLevels.includes(levelId);
 };
 
-// ------------------- Child Process (Internal Backend) -------------------
-const internalProc = fork(INTERNAL_SERVER_SCRIPT, [], {
-    silent: false,
-    detached: false,
-});
-
-internalProc.on('error', (err) => {
-    console.error('[Internal] Startup error:', err.message);
-});
-
-// Clean up child process when the main process exits
-const cleanup = () => {
-    if (internalProc && !internalProc.killed) {
-        internalProc.kill();
-    }
-};
-process.on('exit', cleanup);
-process.on('SIGINT', () => {
-    cleanup();
-    process.exit(0);
-});
-process.on('SIGTERM', () => {
-    cleanup();
-    process.exit(0);
-});
 
 // ------------------- Express App Setup -------------------
 const app = express();
@@ -64,9 +43,9 @@ const app = express();
 // Handlebars view engine setup
 app.set('view engine', 'hbs');
 app.set('views', VIEWS_DIR);
-
 // Serve static files (home.html, style.css, etc.) from the view folder
 app.use(express.static(VIEWS_DIR));
+
 
 // ------------------- Routes -------------------
 // Home page redirect
@@ -106,6 +85,12 @@ app.get('/ssrf/:level/fetch', async (req, res) => {
     }
 
     try {
+        const config = loadConfig(levelId);
+        console.log(`[server.js] config: ${JSON.stringify(config, null, 2)}`);
+
+        const internalServer = new InternalServer(config.internalPort)
+        await internalServer.startServer();
+        
         const content = await levelHandler.handleURL(fileUrl, levelId);
         res.json({ content, isValid: true });
     } catch (err) {

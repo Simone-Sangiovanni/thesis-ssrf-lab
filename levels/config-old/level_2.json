@@ -1,0 +1,15 @@
+{
+    "protocol": [
+        "https",
+        "http"
+    ],
+    "hostWhitelist": [],
+    "hostBlacklist": [],
+    "portWhitelist": [],
+    "portBlacklist": [],
+    "fileWhitelist": [
+        "/flags/level_2"
+    ],
+    "fileBlacklist": [],
+    "doubleEncoding": false
+}

@@ -187,6 +187,7 @@ module.exports = { handleURL };
 
 
 
+// Logically correct implementation, but it doesn't work 
 async function httpScheme_fetch2(parsedUrl, config, level) {
     // decode
     const decodedAuthority = decodeURIComponent(parsedUrl.authority);
@@ -224,7 +225,7 @@ async function httpScheme_fetch2(parsedUrl, config, level) {
 
 
 
-
+// new verion
 async function httpScheme_fetch3(parsedUrl, config, level) {
     if(!config.doubleEncoding) {
         // decode

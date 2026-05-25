@@ -1,0 +1,26 @@
+{
+  "_comment": [
+    "Level 4 — decodeAuthority added before the blacklist check.",
+    "URL-encoding no longer works because the authority is decoded first.",
+    "The blacklist still compares strings literally, so alternate IPv4",
+    "representations bypass it.",
+    "Bypasses:",
+    "  - Decimal:   http://2130706433/     (127.0.0.1 as uint32)",
+    "  - Hex:       http://0x7f000001/",
+    "  - Octal:     http://017700000001/",
+    "  - Dotted hex: http://0x7f.0x0.0x0.0x1/",
+    "  - Dotted octal: http://0177.0.0.01/"
+  ],
+  "pipeline": [
+    "checkProtocol",
+    "decodeAuthority",
+    "checkHostBlacklist"
+  ],
+  "allowedProtocols": ["http", "https"],
+  "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
+  "hostWhitelist": [],
+  "portBlacklist": [],
+  "portWhitelist": [],
+  "fileWhitelist": ["/flags/level_4"],
+  "randomPort": false
+}

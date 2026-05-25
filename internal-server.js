@@ -1,78 +1,101 @@
+// internal_server.js
 const express = require('express');
-const path = require('path');
 const http = require('http');
+const https = require('https');
 const fs = require('fs').promises;
+const path = require('path');
 
-const misc = require('./utils/miscellaneous');
-const PORT = 80;
+// ---------- Configuration ----------
+const PORT = process.argv[2] ? parseInt(process.argv[2], 10) : 4000;
 
+// ---------- Create Express App ----------
 const app = express();
 
-// list of the valid levels: ["level_1", "level_2", ...]
-const VALID_LEVELS = misc.getValidLevels();
- 
-// Accept only local requests
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// CORS (only needed if called from browser; fine for internal use)
 app.use((req, res, next) => {
-    const ip = req.socket.remoteAddress;   // Get client IP from the raw socket
-    console.log("\nip: " + ip);
-    const isLocal = ['127.0.0.1', '::1'].includes(ip); // Check if IP is exactly 127.0.0.1
-    if (!isLocal) {
-        return res.status(403).send({ error: 'IP blocked' }); // Reject non-local
-    }
-    next(); // Allow localhost requests to proceed
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+    next();
 });
 
-// internal API gateway
-app.get('/', async (req, res) => {
-    const entries = await fs.readdir('/');
-    res.send({
-        endpoints: entries,
-    });
+// ---------- Routes ----------
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', port: PORT });
 });
 
-// handle the internal http requests, provide directory contents or the content of the level's flag.
-// do not allow reading other files 
-app.use(async (req, res) => {
-    const level = req.headers['x-current-level'];
-    console.log("\n level: " + level);    
-    console.log("\n path " + req.path);
-    const requested = req.path.substring(1);
-    console.log("\n requested: " + requested);
-    const fullPath = path.resolve('/', requested);
-    console.log("\n fullPath: " + fullPath);
-    
-    // Reject if header is missing or invalid
-    if (!level || !VALID_LEVELS.includes(level)) {
-        return res.status(403).send({ error: 'Missing or invalid X-Current-Level header' });
+// Fetch any URL – main endpoint for SSRF levels
+app.get('/fetch', async (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl) {
+        return res.status(400).json({ error: 'Missing ?url parameter' });
     }
-    
-    const stat = await fs.stat(fullPath); // get info about the path: directory or file
-    if (stat.isDirectory()) {
-        // Directory request → return contents as text
-        const entries = await fs.readdir(fullPath);
-        return res.send({
-            directory: fullPath,
-            contents: entries
+
+    try {
+        const result = await fetchUrl(targetUrl);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Read a local file (restricted to a safe directory)
+app.get('/read-file', async (req, res) => {
+    const filePath = req.query.path;
+    if (!filePath) {
+        return res.status(400).json({ error: 'Missing ?path parameter' });
+    }
+
+    // Security: only allow files inside ./internal-files
+    const safeBase = path.join(__dirname, 'internal-files');
+    const absolutePath = path.resolve(safeBase, filePath);
+    if (!absolutePath.startsWith(safeBase)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    try {
+        const content = await fs.readFile(absolutePath, 'utf8');
+        res.send(content);
+    } catch (err) {
+        res.status(404).json({ error: 'File not found' });
+    }
+});
+
+// Add more endpoints as needed for other levels (e.g., POST /proxy, /dns, etc.)
+
+// ---------- Helper: Fetch any URL (HTTP/HTTPS) ----------
+async function fetchUrl(targetUrl) {
+    return new Promise((resolve, reject) => {
+        const protocol = targetUrl.startsWith('https') ? https : http;
+        const request = protocol.get(targetUrl, (response) => {
+            let data = '';
+            response.on('data', chunk => data += chunk);
+            response.on('end', () => resolve(data));
         });
-    } else {
-        if (fullPath.includes(level)) {
-            const content = await fs.readFile(fullPath, 'utf8');
-            return res.send(content);
-        } else {
-            return res.status(403).send({error: `You cannot read this flag: "${fullPath}".`});
-        }
-    }
+        request.on('error', reject);
+        request.setTimeout(5000, () => {
+            request.destroy();
+            reject(new Error('Request timeout'));
+        });
+    });
+}
+
+// ---------- Start Server ----------
+const server = app.listen(PORT, '127.0.0.1', () => {
+    console.log(`[Internal Server] Listening on http://127.0.0.1:${PORT}`);
+    // Notify parent process that we are ready
+    if (process.send) process.send('ready');
 });
 
-
-// create 2 servers that shares the same backend. One that listen to the ipv4 interface and the other to the ipv6 interface
-const server4 = http.createServer(app);
-const server6 = http.createServer(app);
-
-app.listen(PORT, '127.0.0.1', () => {
-    console.log(`✅ Server IPv4 in ascolto su http://127.0.0.1:${PORT}`);
-});
-
-app.listen(PORT, '::1', () => {
-    console.log(`✅ Server IPv6 in ascolto su http://[::1]:${PORT}`);
-});
+// ---------- Graceful Shutdown ----------
+const shutdown = () => {
+    console.log('[Internal Server] Shutting down...');
+    server.close(() => process.exit(0));
+};
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
