@@ -12,6 +12,8 @@ const InternalServer = require('./internal-server-manager');
 const PORT = process.env.PORT || 3000;
 const VIEWS_DIR = path.join(__dirname, 'view');
 const INTERNAL_SERVER_SCRIPT = path.join(__dirname, 'internal-server.js');
+// Registry of running internal servers (port -> InternalServer instance)
+const runningInternalServers = new Map();
 
 
 // ------------------- Helper Functions -------------------
@@ -86,10 +88,26 @@ app.get('/ssrf/:level/fetch', async (req, res) => {
 
     try {
         const config = loadConfig(levelId);
+        const internalPort = config.internalPort;
         console.log(`[server.js] config: ${JSON.stringify(config, null, 2)}`);
+        
+        let internalServer = runningInternalServers.get(internalPort);
+        if(!internalServer) {
+            const internalServer = new InternalServer(config.internalPort)
+            await internalServer.startServer();
+            runningInternalServers.set(internalPort, internalServer);
 
-        const internalServer = new InternalServer(config.internalPort)
-        await internalServer.startServer();
+            // Clean up registry entry when the server stops/crashes
+            const cleanup = internalServer.cleanupServer.bind(internalServer);
+            internalServer.cleanupServer = () => {
+                cleanup();
+                if (runningInternalServers.get(internalPort) === internalServer) {
+                    runningInternalServers.delete(internalPort);
+                }
+            };
+        }
+
+        
         
         const content = await levelHandler.handleURL(fileUrl, levelId);
         res.json({ content, isValid: true });
