@@ -79,7 +79,7 @@ async function handleURL(url, level) {
     throw new BlockedError(`No handler registered for scheme "${parsedUrl.scheme}"`);
   }
 
-  return handler(ctx, config, level);
+  return protocol_handler(ctx, config, level);
 }
 
 module.exports = { handleURL };

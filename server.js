@@ -2,9 +2,9 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 
-const levelHandler = require('./new_structure/handler');
+const levelHandler = require('./handler');
 const misc = require('./utils/miscellaneous');
-const { loadConfig } = require('./new_structure/utils/config_utils');
+const { loadConfig } = require('./utils/config_utils');
 const InternalServer = require('./internal-server-manager');
 
 
@@ -12,6 +12,7 @@ const InternalServer = require('./internal-server-manager');
 const PORT = process.env.PORT || 3000;
 const VIEWS_DIR = path.join(__dirname, 'view');
 const INTERNAL_SERVER_SCRIPT = path.join(__dirname, 'internal-server.js');
+const hintsFolder = path.join(__dirname, 'hints');
 // Registry of running internal servers (port -> InternalServer instance)
 const runningInternalServers = new Map();
 
@@ -67,8 +68,10 @@ app.get('/ssrf/:level', async (req, res) => {
     }
 
     const levelName = formatLevelName(levelId);
+    const hintPath = path.join(hintsFolder, levelId);
+    const hint = fs.readFileSync(hintPath, 'utf8');
     // TODO: pass the appropriate hint for the level
-    res.render('level', { level: levelId, levelName });
+    res.render('level', { level: levelId, levelName: levelName, hint: hint });
 });
 
 // API endpoint that performs the SSRF fetch (called via AJAX from the browser)
@@ -107,8 +110,6 @@ app.get('/ssrf/:level/fetch', async (req, res) => {
             };
         }
 
-        
-        
         const content = await levelHandler.handleURL(fileUrl, levelId);
         res.json({ content, isValid: true });
     } catch (err) {

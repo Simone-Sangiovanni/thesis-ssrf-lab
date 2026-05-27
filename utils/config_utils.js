@@ -1,44 +1,83 @@
-const path = require('path');
-const fs = require('fs');
+'use strict';
 
-// Default configuration structure for a level
-const DEFAULT_CONFIG = {
-    protocol: [],
-    hostWhitelist: [],
-    hostBlacklist: [],
-    portWhitelist: [],
-    portBlacklist: [],
-    fileWhitelist: [],
-    fileBlacklist: [],
-    doubleEncoding: false
-};
+const fs = require('fs');
+const path = require('path');
+const state = require('../state');
+const { ConfigError } = require('../errors');
+
+const CONFIG_DIR = path.join(__dirname, '../config');
+
+// Default port for the internal server (levels 1–5)
+const DEFAULT_INTERNAL_PORT = 80;
+
+// Port range for random selection (level 6)
+const RANDOM_PORT_MIN = 5000;
+const RANDOM_PORT_MAX = 25000;
 
 /**
- * Reads and parses the configuration file for a given level.
- * The config file is expected to be located at:
- *   <project_root>/levels/config/<level>.json
+ * Loads and returns the parsed JSON configuration for `level`.
  *
- * @param {string} level - Level identifier (e.g., "level_1", "level_2")
- * @returns {Object} Configuration object for the level (merged with defaults)
- * @throws {Error} If the config file cannot be read or parsed
+ * Applies runtime overrides on top of the static JSON:
+ *   - Levels with `"randomPort": true` receive a stable random port assigned
+ *     on first access and reused for the lifetime of the process.
+ *   - All other levels use `DEFAULT_INTERNAL_PORT`.
+ *
+ * Throws if the config file cannot be read or parsed.
  */
-function parseConfig(level) {
-    const configFileName = `${level}.json`;
-    // __dirname is /app/levels inside the container (or local equivalent)
-    const configPath = path.join(__dirname, '..', 'levels', 'config', configFileName);
-    let config = { ...DEFAULT_CONFIG };
+function loadConfig(level) {
+  const configPath = path.join(CONFIG_DIR, `${level}.json`);
 
-    try {
-        const fileContent = fs.readFileSync(configPath, 'utf8');
-        const parsedConfig = JSON.parse(fileContent);
-        // Merge the parsed config over the defaults
-        config = { ...config, ...parsedConfig };
-    } catch (err) {
-        console.error(`[parseConfig] Failed to load config for level "${level}" from ${configPath}: ${err.message}`);
-        throw new Error(`Error while parsing config file for level "${level}"`);
+  let config;
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  } catch (err) {
+    throw new ConfigError(`Cannot load config for "${level}": ${err.message}`);
+  }
+
+  // Inject internalPort into the config object so handlers can use it
+  if (config.randomPort) {
+    if (!state.get(level, 'internalPort')) {
+      const port = Math.floor(Math.random() * (RANDOM_PORT_MAX - RANDOM_PORT_MIN + 1)) + RANDOM_PORT_MIN;
+      state.set(level, 'internalPort', port);
+      console.log(`[config] Level "${level}" — random internal port assigned: ${port}`);
     }
+    config.internalPort = state.get(level, 'internalPort');
+  } else {
+    config.internalPort = DEFAULT_INTERNAL_PORT;
+  }
 
-    return config;
+  delete config._comment;
+
+  return config;
 }
 
-module.exports = { parseConfig };
+/**
+ * Output example:
+ * 
+{
+  "pipeline": [
+    "checkProtocol",
+    "decodeAuthority",
+    "normalizeIpRepresentation",
+    "checkHostBlacklist"
+  ],
+  "allowedProtocols": [
+    "http",
+    "https"
+  ],
+  "hostBlacklist": [
+    "127.0.0.1",
+    "localhost",
+    "0.0.0.0",
+    "::1"
+  ],
+  "hostWhitelist": [],
+  "portBlacklist": [],
+  "portWhitelist": [],
+  "fileWhitelist": [],
+  "randomPort": true,
+  "internalPort": 40414
+}
+ */
+
+module.exports = { loadConfig };

@@ -34,8 +34,9 @@ async function httpHandler({ parsedUrl, authority }, _config, level) {
   // may still be percent-encoded here; in that case resolution will fail and
   // we simply skip the header — the request still goes through.
   let targetIsLoopback = false;
-  try {
-    const resolved = await ipUtils.resolveHost(authority.host);
+  try { 
+    const host = decodeURIComponent(authority.host);
+    const resolved = await ipUtils.resolveHost(host);
     targetIsLoopback = ipUtils.isLoopback(resolved.address);
   } catch {
     // Non-critical: resolveHost can fail for encoded/synthetic addresses.
@@ -44,6 +45,7 @@ async function httpHandler({ parsedUrl, authority }, _config, level) {
   }
 
   const fetchOptions = targetIsLoopback ? { headers: { 'X-Current-Level': level } } : {};
+  console.log(`fetch options: ${JSON.stringify(fetchOptions, null, 2)}`);
 
   // ── Send the request ───────────────────────────────────────────────────────
   let response;

@@ -194,3 +194,75 @@ a:hover {
 	color: rgba(255, 255, 255, 0.4);
 	text-align: center;
 }
+
+/* === Stylish Hint Dropdown (simple) === */
+details {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 69, 96, 0.3);
+    border-radius: 12px;
+    margin: 25px 0 10px 0;
+    transition: all 0.25s ease;
+}
+
+details[open] {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: #e94560;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+summary {
+    padding: 12px 20px;
+    font-weight: 600;
+    color: #e94560;
+    cursor: pointer;
+    list-style: none;          /* remove default triangle */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 12px;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+/* Custom arrow (rotates on open) */
+summary::before {
+    content: '▶';
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+    display: inline-block;
+    color: #ff6b6b;
+    margin-right: 6px;
+}
+
+details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+/* Hide default triangle in WebKit */
+summary::-webkit-details-marker {
+    display: none;
+}
+
+summary:hover {
+    background: rgba(233, 69, 96, 0.1);
+    letter-spacing: 0.2px;
+}
+
+details p {
+    margin: 0;
+    padding: 8px 20px 18px 20px;
+    border-top: 1px solid rgba(233, 69, 96, 0.2);
+    color: #d0d0d0;
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+details code {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85rem;
+    color: #ffaa88;
+    border: 1px solid rgba(233, 69, 96, 0.3);
+}

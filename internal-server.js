@@ -43,7 +43,8 @@ app.get('/', async (req, res) => {
 // handle the internal http requests, provide directory contents or the content of the level's flag.
 // do not allow reading other files 
 app.use(async (req, res) => {
-    const level = req.headers['x-current-level'];
+    let level = req.headers['x-current-level'];
+    console.log(`level: ${level}`);
     const requested = req.path.substring(1);
     const fullPath = path.resolve('/', requested);
     
@@ -61,6 +62,11 @@ app.use(async (req, res) => {
             contents: entries
         });
     } else {
+        // exceptional behavior just for level 1
+        if(level === 'level_1') {
+            return res.status(403).send({error: `Just in level 1 you cannot read the flag file using the http protocol".`});
+        }
+        // standard behavior
         if (fullPath.includes(level)) {
             const content = await fs.readFile(fullPath, 'utf8');
             return res.send(content);
