@@ -34,28 +34,51 @@ La struttura del file di configurazione è la seguente:
 ```json
 {
   "_comment": [
+
     "Level 5 — normalizeIpRepresentation added.",
+
     "Decimal/octal/hex alternate representations are converted to dotted-quad",
+
     "before the blacklist check, closing those bypasses.",
+
     "IPv4-mapped IPv6 is not yet handled, so it bypasses the blacklist.",
+
     "Bypasses:",
+
     "  - IPv4-mapped IPv6: http://[::ffff:127.0.0.1]/",
+
     "  - Also works:       http://[::ffff:7f00:1]/",
+
     "    (both notations for the same address)"
+
   ],
+
   "pipeline": [
+
     "checkProtocol",
+
     "decodeAuthority",
+
     "normalizeIpRepresentation",
+
     "checkHostBlacklist"
+
   ],
+
   "allowedProtocols": ["http", "https"],
+
   "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
+
   "hostWhitelist": [],
+
   "portBlacklist": [],
+
   "portWhitelist": [],
+
   "fileWhitelist": ["/flags/level_5"],
+
   "randomPort": false
+
 }
 ```
 - **comment**: descrizione del livello e risoluzione
