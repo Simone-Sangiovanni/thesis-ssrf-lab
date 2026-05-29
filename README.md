@@ -57,7 +57,7 @@ La struttura del file di configurazione è la seguente:
   "fileWhitelist": ["/flags/level_5"],
   "randomPort": false
 }
-`` `
+```
 
 ### Come generare questo file automaticamente
 
