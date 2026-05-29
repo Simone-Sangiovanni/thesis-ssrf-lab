@@ -8,7 +8,7 @@ const fs = require('fs');
  * @returns {string[]} Array of level identifiers (e.g., ["level_1", "level_2"]). Returns an empty array on error.
  */
 function getValidLevels() {
-    const configDir = path.join(__dirname, '..', 'levels', 'config');
+    const configDir = path.join(__dirname, '..', 'config');
 
     try {
         const files = fs.readdirSync(configDir);
