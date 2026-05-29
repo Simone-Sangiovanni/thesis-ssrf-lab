@@ -81,9 +81,4 @@ La struttura del file delle flag è il seguente:
 ```json
 	flag{flag_content}
 ```
-<<<<<<< HEAD
 Questo file è un semplicissimo file di testo (senza estensione) che contiene la flag del livello. Io ho scelto questo formato per la flag, ma in realtà si può scrivere qualunque cosa.
-=======
-
-Questo file è un semplicissimo file di testo (senza estensione) che contiene la flag del livello. Io ho scelto questo formato per la flag, ma in realtà si può scrivere qualunque cosa.
->>>>>>> 8be95e7 (update README)
