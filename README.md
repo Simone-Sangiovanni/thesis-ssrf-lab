@@ -33,39 +33,31 @@ dove `x` è il numero del livello
 La struttura del file di configurazione è la seguente:
 ```json
 {
-  "_comment": [
-    "Level 5 — normalizeIpRepresentation added.",
-    "Decimal/octal/hex alternate representations are converted to dotted-quad",
-    "before the blacklist check, closing those bypasses.",
-    "IPv4-mapped IPv6 is not yet handled, so it bypasses the blacklist.",
-    "Bypasses:",
-    "  - IPv4-mapped IPv6: http://[::ffff:127.0.0.1]/",
-    "  - Also works:       http://[::ffff:7f00:1]/",
-    "    (both notations for the same address)"
-  ],
-  "pipeline": [
-    "checkProtocol",
-    "decodeAuthority",
-    "normalizeIpRepresentation",
-    "checkHostBlacklist"
-  ],
-  "allowedProtocols": ["http", "https"],
-  "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
-  "hostWhitelist": [],
-  "portBlacklist": [],
-  "portWhitelist": [],
-  "fileWhitelist": ["/flags/level_5"],
-  "randomPort": false
+  "_comment": [
+    "Level 5 — normalizeIpRepresentation added.",
+    "Decimal/octal/hex alternate representations are converted to dotted-quad",
+    "before the blacklist check, closing those bypasses.",
+    "IPv4-mapped IPv6 is not yet handled, so it bypasses the blacklist.",
+    "Bypasses:",
+    "  - IPv4-mapped IPv6: http://[::ffff:127.0.0.1]/",
+    "  - Also works:       http://[::ffff:7f00:1]/",
+    "    (both notations for the same address)"
+  ],
+  "pipeline": [
+    "checkProtocol",
+    "decodeAuthority",
+    "normalizeIpRepresentation",
+    "checkHostBlacklist"
+  ],
+  "allowedProtocols": ["http", "https"],
+  "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
+  "hostWhitelist": [],
+  "portBlacklist": [],
+  "portWhitelist": [],
+  "fileWhitelist": ["/flags/level_5"],
+  "randomPort": false
 }
 ```
-
-### Come generare questo file automaticamente
-
-#### Da riga di comando (Linux/macOS/Windows con Git Bash)
-Supponendo che il JSON sia salvato in `input.json`:
-
-```bash
-(echo '```json' && cat input.json && echo '```') > output.md
 - **comment**: descrizione del livello e risoluzione
 - **pipeline**: specifica l'ordine in cui vengono eseguite le difese. I nomi delle difese specificate qui devono essere gli stessi delle funzioni in `defenses/defenses.js`.
 - **allowedProtocols**: lista di protocolli supportati, ad esempio http, https, file...
