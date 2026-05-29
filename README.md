@@ -75,6 +75,7 @@ Il file di configurazione dei livelli deve essere nella seguente forma:
 dove `x` è il numero del livello
 ### Contenuto
 La struttura del file delle flag è il seguente:
+
 ```json
 flag{flag_content}
 ```
