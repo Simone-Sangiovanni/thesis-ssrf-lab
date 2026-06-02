@@ -1,6 +1,6 @@
 'use strict';
 
-const { BlockedError } = require('../errors');
+const { BlockedError } = require('../utils/errors');
 const ipUtils  = require('../utils/ip');
 const urlUtils = require('../utils/url_utils');
 

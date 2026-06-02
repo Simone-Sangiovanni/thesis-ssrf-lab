@@ -2,7 +2,7 @@
 // certain error-prone or legacy features
 'use strict';
 
-const { BlockedError, ConfigError, UrlError } = require('./errors');
+const { BlockedError, ConfigError, UrlError } = require('./utils/errors');
 const { loadConfig } = require('./utils/config_utils');
 const urlUtils = require('./utils/url_utils');
 const defenses = require('./defenses/defenses');

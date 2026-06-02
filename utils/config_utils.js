@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const state = require('../state');
-const { ConfigError } = require('../errors');
+const { ConfigError } = require('./errors');
 
 const CONFIG_DIR = path.join(__dirname, '../config');
 
