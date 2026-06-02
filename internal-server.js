@@ -40,6 +40,16 @@ app.get('/', async (req, res) => {
     });
 });
 
+
+app.get('/env', async (req, res) => {
+    const env = process.env;
+    console.log(JSON.stringify(process.env, null, 2));
+    return res.send({
+        env: env
+    });
+});
+
+
 // handle the internal http requests, provide directory contents or the content of the level's flag.
 // do not allow reading other files 
 app.use(async (req, res) => {
@@ -52,8 +62,13 @@ app.use(async (req, res) => {
     if (!level || !VALID_LEVELS.includes(level)) {
         return res.status(403).send({ error: 'Missing or invalid X-Current-Level header' });
     }
+
+    try {
+        const stat = await fs.stat(fullPath); // get info about the path: directory or file
+    } catch (err) {
+        return res.status(404).send({ error: 'Not found' });
+    }
     
-    const stat = await fs.stat(fullPath); // get info about the path: directory or file
     if (stat.isDirectory()) {
         // Directory request → return contents as text
         const entries = await fs.readdir(fullPath);
@@ -79,12 +94,12 @@ app.use(async (req, res) => {
 
 // create 2 servers that shares the same backend. One that listen to the ipv4 interface and the other to the ipv6 interface
 const server4 = app.listen(PORT, '127.0.0.1', () => {
-    console.log(`✅ Server IPv4 in ascolto su http://127.0.0.1:${PORT}`);
+    console.log(`Server IPv4 in ascolto su http://127.0.0.1:${PORT}`);
     if (process.send) process.send('ready');
 });
 
 const server6 = app.listen(PORT, '::1', () => {
-    console.log(`✅ Server IPv6 in ascolto su http://[::1]:${PORT}`);
+    console.log(`Server IPv6 in ascolto su http://[::1]:${PORT}`);
     if (process.send) process.send('ready');
 });
 
