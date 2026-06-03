@@ -1,13 +1,11 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 
 const levelHandler = require('./handler');
 const misc = require('./utils/miscellaneous');
 const { loadConfig } = require('./utils/config_utils');
 const InternalServer = require('./internal-server-manager');
-
-
 
 // ------------------- Configuration -------------------
 const PORT = process.env.PORT || 3000;
@@ -17,8 +15,6 @@ const HINTS_FOLDER = path.join(__dirname, 'hints');
 // Registry of running internal servers (port -> InternalServer instance)
 const runningInternalServers = new Map();
 
-
-
 // ------------------- Express App Setup -------------------
 const app = express();
 
@@ -27,8 +23,6 @@ app.set('view engine', 'hbs');
 app.set('views', VIEWS_DIR);
 // Serve static files (home.html, style.css, etc.) from the view folder
 app.use(express.static(VIEWS_DIR));
-
-
 
 // ------------------- Routes -------------------
 // Home page redirect
@@ -54,7 +48,7 @@ app.get('/ssrf/:level', async (req, res) => {
     try {
         const levelName = misc.formatLevelName(levelId);
         const hintPath = path.join(HINTS_FOLDER, levelId);
-        const hint = fs.readFileSync(hintPath, 'utf8');
+        const hint = await fs.readFile(hintPath, 'utf8');
         // render the level html page
         res.render('level', { level: levelId, levelName: levelName, hint: hint });
     } catch (error) {

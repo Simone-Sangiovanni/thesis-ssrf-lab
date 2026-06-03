@@ -1,114 +1,122 @@
-// internal_server.js
 const express = require('express');
-const http = require('http');
 const fs = require('fs').promises;
 const path = require('path');
-
 const misc = require('./utils/miscellaneous');
 
 
-// ---------- Configuration ----------
 const PORT = process.argv[2] ? parseInt(process.argv[2], 10) : 4000;
-// list of the valid levels: ["level_1", "level_2", ...]
 const VALID_LEVELS = misc.getValidLevels();
-
-// ---------- Create Express App ----------
 const app = express();
+// Simple in-memory cache to shield the disk from heavy fuzzer traffic
+const statCache = new Map();
+const CACHE_TTL = 5000; // Keep cache entries for 5 seconds
 
-// Middleware
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Accept only local requests
+
+// IP validation middleware
 app.use((req, res, next) => {
-    const ip = req.socket.remoteAddress;   // Get client IP from the raw socket
-    console.log("\nip: " + ip);
-    const isLocal = ['127.0.0.1', '::1'].includes(ip); // Check if IP is exactly 127.0.0.1
-    if (!isLocal) {
-        return res.status(403).send({ error: 'IP blocked' }); // Reject non-local
+    let ip = req.socket.remoteAddress;
+    if (ip.startsWith('::ffff:')) {
+        ip = ip.substring(7);
     }
-    next(); // Allow localhost requests to proceed
-});
-
-// ---------- Routes ----------
-
-// internal API gateway
-app.get('/', async (req, res) => {
-    const entries = await fs.readdir('/');
-    res.send({
-        endpoints: entries,
-    });
+    if (!['127.0.0.1', '::1'].includes(ip)) {
+        return res.status(403).send({ error: 'IP blocked' });
+    }
+    next();
 });
 
 
-app.get('/env', async (req, res) => {
-    const env = process.env;
-    console.log(JSON.stringify(process.env, null, 2));
-    return res.send({
-        env: env
-    });
+app.get('/', async (req, res, next) => {
+    try {
+        const entries = await fs.readdir('/');
+        res.send({ endpoints: entries });
+    } catch (err) {
+        next(err);
+    }
 });
 
 
-// handle the internal http requests, provide directory contents or the content of the level's flag.
-// do not allow reading other files 
-app.use(async (req, res) => {
-    let level = req.headers['x-current-level'];
-    console.log(`level: ${level}`);
+app.get('/secretPath', async (req, res, next) => {
+    try {
+        return res.send({ env: process.env });
+    } catch (err) {
+        next(err);
+    }
+});
+
+
+// Main request handler
+app.use(async (req, res, next) => {
+    const level = req.headers['x-current-level'];
     const requested = req.path.substring(1);
     const fullPath = path.resolve('/', requested);
     
-    // Reject if header is missing or invalid
     if (!level || !VALID_LEVELS.includes(level)) {
         return res.status(403).send({ error: 'Missing or invalid X-Current-Level header' });
     }
 
-    try {
-        const stat = await fs.stat(fullPath); // get info about the path: directory or file
-    } catch (err) {
-        return res.status(404).send({ error: 'Not found' });
+    let stat;
+    const now = Date.now();
+    const cached = statCache.get(fullPath);
+
+    // Serve stats from memory if available to optimize threadpool performance
+    if (cached && (now - cached.timestamp < CACHE_TTL)) {
+        stat = cached.stat;
+    } else {
+        try {
+            stat = await fs.stat(fullPath);
+            statCache.set(fullPath, { stat, timestamp: now });
+        } catch (err) {
+            return res.status(404).send({ error: 'Not found' });
+        }
     }
     
-    if (stat.isDirectory()) {
-        // Directory request → return contents as text
-        const entries = await fs.readdir(fullPath);
-        return res.send({
-            directory: fullPath,
-            contents: entries
-        });
-    } else {
-        // exceptional behavior just for level 1
-        if(level === 'level_1') {
-            return res.status(403).send({error: `Just in level 1 you cannot read the flag file using the http protocol".`});
-        }
-        // standard behavior
-        if (fullPath.includes(level)) {
-            const content = await fs.readFile(fullPath, 'utf8');
-            return res.send(content);
+    try {
+        if (stat.isDirectory()) {
+            const entries = await fs.readdir(fullPath);
+            return res.send({ directory: fullPath, contents: entries });
         } else {
-            return res.status(403).send({error: `You cannot read this flag: "${fullPath}".`});
+            if (level === 'level_1') {
+                return res.status(403).send({ error: 'Just in level 1 you cannot read the flag file using the http protocol.' });
+            }
+            if (fullPath.includes(level)) {
+                const content = await fs.readFile(fullPath, 'utf8');
+                return res.send(content);
+            } else {
+                return res.status(403).send({ error: `You cannot read this flag: "${fullPath}".` });
+            }
         }
+    } catch (err) {
+        next(err); 
     }
 });
 
 
-// create 2 servers that shares the same backend. One that listen to the ipv4 interface and the other to the ipv6 interface
-const server4 = app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Server IPv4 in ascolto su http://127.0.0.1:${PORT}`);
-    if (process.send) process.send('ready');
-});
-
-const server6 = app.listen(PORT, '::1', () => {
-    console.log(`Server IPv6 in ascolto su http://[::1]:${PORT}`);
-    if (process.send) process.send('ready');
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error("Unhandled Error:", err.message);
+    if (!res.headersSent) {
+        res.status(500).send({ error: 'Internal Server Error' });
+    }
 });
 
 
-// ---------- Graceful Shutdown ----------
+
+// Single dual-stack listener
+const server = app.listen(PORT, '::', () => {
+    console.log(`Server listening on port ${PORT} (IPv4/IPv6 Dual-Stack)`);
+    if (process.send) process.send('ready');
+});
+
+
 const shutdown = () => {
     console.log('[Internal Server] Shutting down...');
-    server4.close(() => process.exit(0));
-    server6.close(() => process.exit(0));
+    server.close(() => process.exit(0));
 };
+
+
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
