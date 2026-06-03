@@ -1,6 +1,7 @@
 FROM node:24-alpine
 WORKDIR /app
 COPY package.json .
+# This installs both production and development dependencies (like nodemon)
 RUN npm install
 COPY . .
 RUN mkdir -p /flags && mv assets/* /flags/ && rmdir assets
