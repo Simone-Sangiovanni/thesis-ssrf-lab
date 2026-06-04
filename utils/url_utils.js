@@ -27,28 +27,43 @@ function RFC3986_URLParser(url) {
 // ─── Authority parsing and building ──────────────────────────────────────────
 
 /**
- * Parses an authority string — [userinfo@]host[:port] — into its parts.
+ * Parses an authority string — [username:password@]host[:port] — into its parts.
  *
  * Handles IPv6 literals enclosed in brackets (e.g. [::1], [::ffff:127.0.0.1]).
  * The brackets are kept as part of the returned `host` string so that
  * rebuilding the authority is unambiguous.
  *
- * Returns { userinfo: string|null, host: string, port: number|null }.
+ * Returns { username: string|null, password: string|null host: string, port: number|null }.
  */
 function parseAuthority(authority) {
-  if (!authority) return { userinfo: null, host: '', port: null };
+  if (!authority) return { username: null, password: null, host: '', port: null };
 
   // ── Extract userinfo ──────────────────────────────────────────────────────
   let userinfo = null;
   let hostPort  = authority;
-  const atIdx   = authority.lastIndexOf('@');
+  const atIdx = authority.indexOf('@');
   if (atIdx !== -1) {
     userinfo = authority.slice(0, atIdx);
     hostPort = authority.slice(atIdx + 1);
   }
 
+
+  // ── Extract username and password ─────────────────────────────────────────────────
+  let username = null, password = null;
+
+  if(userinfo !== null) {
+    const colonIdx = userinfo.indexOf(':');
+    if(colonIdx !== -1) {
+      username = userinfo.slice(0, colonIdx);
+      password = userinfo.slice(colonIdx + 1);
+    } else {
+      username = userinfo;
+    }
+    if(username === "") username = null;
+  }
+
   // ── Extract host and port ─────────────────────────────────────────────────
-  let host, port = null;
+  let host = null, port = null;
 
   if (hostPort.startsWith('[')) {
     // IPv6 literal: [::1] or [::ffff:127.0.0.1]:8080
@@ -73,7 +88,8 @@ function parseAuthority(authority) {
   }
 
   return {
-    userinfo,
+    username,
+    password,
     host,
     port: port !== null ? parseInt(port, 10) : null,
   };
@@ -83,13 +99,18 @@ function parseAuthority(authority) {
  * Rebuilds an authority string from its parsed components.
  * Adds IPv6 brackets when the host contains a colon but no brackets yet.
  */
-function buildAuthority({ userinfo, host, port }) {
+function buildAuthority({ username, password, host, port }) {
   let h = host;
   // Wrap bare IPv6 addresses in brackets
   if (h.includes(':') && !h.startsWith('[')) h = `[${h}]`;
 
   let authority = h;
   if (port !== null) authority = `${authority}:${port}`;
+
+  let userinfo = null;
+  if(username !== null) userinfo = username;
+  if(password !== null) userinfo = [userinfo, password].join(':');
+
   if (userinfo !== null) authority = `${userinfo}@${authority}`;
   return authority;
 }
