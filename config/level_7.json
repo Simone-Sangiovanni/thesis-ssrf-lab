@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "Level 7 — User credentials.",
+    "Same pipeline as level 6; IPv4-mapped IPv6 is still the required bypass",
+    "to reach localhost past the blacklist.",
+    "The internal server runs on a random port (chosen at startup and",
+    "stored in state.js). The student must iterate over ports and detect",
+    "the open one by the absence of a connection error.",
+    "Then it has to discover the hidden route that display the environment variables",
+    "where is stored the a user's password and use it to access the flag file",
+    "",
+    "Approach:",
+    "  for port in range(1024, 65536):",
+    "      try http://[::ffff:127.0.0.1]:<port>/",
+    "      if response != 'Connection failed' => found it",
+    "",
+    "  once the port is found:",
+    "  for path in wordlist.txt:",
+    "      try http://[::ffff:127.0.0.1]:<port>/<path>",
+    "      if response != 'Connection failed' => found it",
+    "",
+    "  then read the output to discover the credentials and once you find them pass them",
+    "  inside the URL",
+    "",
+    "randomPort: true instructs config_utils to assign a random port on",
+    "first load and expose it as config.internalPort for the internal server."
+  ],
+  "pipeline": [
+    "checkProtocol",
+    "decodeAuthority",
+    "normalizeIpRepresentation",
+    "checkHostBlacklist"
+  ],
+  "allowedProtocols": ["http", "https"],
+  "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
+  "fileWhitelist": ["/flags/level_7"],
+  "randomPort": true
+}

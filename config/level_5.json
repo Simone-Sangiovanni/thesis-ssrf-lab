@@ -17,9 +17,6 @@
   ],
   "allowedProtocols": ["http", "https"],
   "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
-  "hostWhitelist": [],
-  "portBlacklist": [],
-  "portWhitelist": [],
   "fileWhitelist": ["/flags/level_5"],
   "randomPort": false
 }

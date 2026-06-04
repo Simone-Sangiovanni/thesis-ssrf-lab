@@ -10,9 +10,6 @@
   ],
   "allowedProtocols": ["http", "https"],
   "hostBlacklist": [],
-  "hostWhitelist": [],
-  "portBlacklist": [],
-  "portWhitelist": [],
   "fileWhitelist": ["/flags/level_2"],
   "randomPort": false
 }
