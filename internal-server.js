@@ -30,6 +30,7 @@ app.use((req, res, next) => {
 
 
 app.get('/', async (req, res, next) => {
+    console.log(`request: ${req.headers.authorization}`);
     try {
         const entries = await fs.readdir('/');
         res.send({ endpoints: entries });

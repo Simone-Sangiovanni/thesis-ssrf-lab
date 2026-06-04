@@ -93,7 +93,7 @@ app.get('/ssrf/:level/fetch', async (req, res) => {
             };
         }
 
-        const content = await levelHandler.handleURL(fileUrl, levelId);
+        const content = await levelHandler.handleURL(fileUrl, levelId, config);
         res.json({ content, isValid: true });
     } catch (err) {
         res.status(400).json({ content: err.message, isValid: false });

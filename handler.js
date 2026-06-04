@@ -36,17 +36,16 @@ const protocolHandlers = {
  * @throws {ConfigError} When the level config references an unknown defense.
  * @throws {Error} On network failure, missing config file, etc.
  */
-async function handleURL(url, level) {
+async function handleURL(url, level, config) {
   console.log(`\n${'─'.repeat(60)}`);
   console.log(`[handleURL] url="${url}"  level="${level}"`);
 
   // ── 1. Load level config ─────────────────────────────────────────────────
-  const config = loadConfig(level);
   console.log(`[handleURL] pipeline: [${config.pipeline.join(', ')}]`);
 
   // ── 2. Parse the URL ─────────────────────────────────────────────────────
   const parsedUrl = urlUtils.RFC3986_URLParser(url);
-  console.log(`[handleURL] parsed:`, parsedUrl);
+  console.log(`[handleURL] parsed URL:`, parsedUrl);
 
   if (!parsedUrl.scheme) {
     throw new UrlError('URL has no scheme');
@@ -69,8 +68,12 @@ async function handleURL(url, level) {
       );
     }
     console.log(`[pipeline] → ${name}`);
-    await defense(ctx, config);   // throws BlockedError to halt
+    await defense(ctx, config); // throws BlockedError to halt
   }
+
+  //-------------------------------------------------------------
+  // TODO: keep reviewing from here
+  //-------------------------------------------------------------
 
   // ── 5. Dispatch to protocol handler ─────────────────────────────────────
   const protocol_handler = protocolHandlers[parsedUrl.scheme];

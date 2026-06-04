@@ -44,7 +44,12 @@ async function httpHandler({ parsedUrl, authority }, _config, level) {
     // decodes percent-encoding internally.
   }
 
-  const fetchOptions = targetIsLoopback ? { headers: { 'X-Current-Level': level } } : {};
+  const fetchOptions = targetIsLoopback ? { 
+        headers: { 
+            'X-Current-Level': level,
+            'Authorization': 'Basic ' + Buffer.from(`${authority.userinfo}:${authority.userinfo}`).toString(),
+        } 
+    } : {};
   console.log(`fetch options: ${JSON.stringify(fetchOptions, null, 2)}`);
 
   // ── Send the request ───────────────────────────────────────────────────────

@@ -52,8 +52,8 @@ const defenses = {
    */
   decodeAuthority({ parsedUrl, authority }, _config) {
     const decoded = decodeURIComponent(parsedUrl.authority);
-    parsedUrl.authority = decoded;
-    Object.assign(authority, urlUtils.parseAuthority(decoded));
+    parsedUrl.authority = decoded; // substitute the string "authority" inside the object "parsedUrl" inside the ctx
+    Object.assign(authority, urlUtils.parseAuthority(decoded)); // reassign the "authority" object inside the ctx with the new decoded authority
     console.log(`[decodeAuthority] → "${decoded}"`);
   },
 
@@ -73,9 +73,6 @@ const defenses = {
 
     if (hostBlacklist.includes(host)) {
       throw new BlockedError(`Host "${host}" is blacklisted`);
-    }
-    if (hostWhitelist.length > 0 && !hostWhitelist.includes(host)) {
-      throw new BlockedError(`Host "${host}" is not whitelisted`);
     }
   },
 
