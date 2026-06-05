@@ -17,7 +17,7 @@ const { BlockedError } = require('../utils/errors');
  * @param {Object} config - Level configuration.
  * @returns {Promise<string>} File content or directory listing.
  */
-async function fileHandler({ parsedUrl }, { fileWhitelist = [] }) {
+async function fileHandler({ parsedUrl }, { fileWhitelist = [] }, _level) {
   const normalizedPath = path.normalize(parsedUrl.path);
   console.log(`[fileHandler] Accessing: "${normalizedPath}"`);
 
@@ -29,8 +29,7 @@ async function fileHandler({ parsedUrl }, { fileWhitelist = [] }) {
   }
 
   if (stats.isDirectory()) {
-    const entries = await fs.readdir(normalizedPath);
-    return JSON.stringify({ directory: normalizedPath, contents: entries }, null, 2);
+    return await fs.readdir(normalizedPath);
   }
 
   if (stats.isFile()) {
