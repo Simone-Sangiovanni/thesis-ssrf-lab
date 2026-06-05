@@ -21,7 +21,7 @@ async function resolveHost(host) {
     return { address: parsed.toString(), family: parsed.kind() };
   } catch { /* not a bare IP string — fall through to DNS */ }
 
-  const result = await dns.lookup(clean, { verbatim: true });
+  const result = await dns.lookup(clean/*, { verbatim: true }*/);
   return {
     address: result.address,
     family:  result.family === 4 ? 'ipv4' : 'ipv6',
@@ -35,7 +35,7 @@ async function resolveHost(host) {
  */
 function isLoopback(address) {
   try {
-    const parsed = ipaddr.parse(stripBrackets(address));
+    const parsed = ipaddr.parse(address);
     // Unwrap IPv4-mapped IPv6 before the range check
     if (parsed.kind() === 'ipv6' && parsed.isIPv4MappedAddress()) {
       return parsed.toIPv4Address().range() === 'loopback';
