@@ -71,10 +71,6 @@ async function handleURL(url, level, config) {
     await defense(ctx, config); // throws BlockedError to halt
   }
 
-  //-------------------------------------------------------------
-  // TODO: keep reviewing from here
-  //-------------------------------------------------------------
-
   // ── 5. Dispatch to protocol handler ─────────────────────────────────────
   const protocol_handler = protocolHandlers[parsedUrl.scheme];
   if (!protocol_handler) {

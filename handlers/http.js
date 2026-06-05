@@ -21,10 +21,11 @@ const urlUtils = require('../utils/url_utils');
 async function httpHandler({ parsedUrl, authority }, _config, level) {
   // Rebuild the authority from the (possibly normalised) authority object
   // so the outgoing URL reflects any changes made by defenses.
-  const outgoingAuthority = urlUtils.buildAuthority(authority);
+  const rebuiltAuthority = urlUtils.buildAuthority(authority);
+  console.log(`[httpHandler] Rebuilt authority: ${JSON.stringify(rebuiltAuthority, null, 2)}`);
   const outgoingUrl = urlUtils.rebuildUrl({
     ...parsedUrl, // ... -> spread operator: copy all the properies of parsedUrl into the newly created object
-    authority: outgoingAuthority,
+    authority: rebuiltAuthority, // but substitute the autority field with the rebuilt authority
   });
   console.log(`[httpHandler] → ${outgoingUrl}`);
 
@@ -35,9 +36,13 @@ async function httpHandler({ parsedUrl, authority }, _config, level) {
   // we simply skip the header — the request still goes through.
   let targetIsLoopback = false;
   try { 
+    console.log(`[httpHandler] authority.host: ${authority.host}`);
     const host = decodeURIComponent(authority.host);
+    console.log(`[httpHandler] host: ${host}`);
     const resolved = await ipUtils.resolveHost(host);
+    console.log(`[httpHandler] resolved host: ${JSON.stringify(resolved, null, 2)}`);
     targetIsLoopback = ipUtils.isLoopback(resolved.address);
+    console.log(`[httpHandler] is loopback address? ${targetIsLoopback}`);
   } catch {
     // Non-critical: resolveHost can fail for encoded/synthetic addresses.
     // The outgoing fetch will still work because Node's WHATWG URL parser
@@ -47,7 +52,7 @@ async function httpHandler({ parsedUrl, authority }, _config, level) {
   const fetchOptions = targetIsLoopback ? { 
         headers: { 
             'X-Current-Level': level,
-            'Authorization': 'Basic ' + Buffer.from(`${authority.userinfo}:${authority.userinfo}`).toString(),
+            'Authorization': 'Basic ' + Buffer.from(`${authority.username}:${authority.password}`).toString(),
         } 
     } : {};
   console.log(`fetch options: ${JSON.stringify(fetchOptions, null, 2)}`);
@@ -65,7 +70,7 @@ async function httpHandler({ parsedUrl, authority }, _config, level) {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => response.statusText);
-    throw new Error(`Upstream ${response.status}: ${detail}`);
+    throw new Error(`Upstream error - ${response.status}: ${detail}`);
   }
 
   return response.text();
