@@ -33,7 +33,7 @@ app.get('/', async (req, res, next) => {
     console.log(`request: ${req.headers.authorization}`);
     try {
         const entries = await fs.readdir('/');
-        res.send({ endpoints: entries });
+        res.send(entries);
     } catch (err) {
         next(err);
     }
@@ -78,7 +78,7 @@ app.use(async (req, res, next) => {
     try {
         if (stat.isDirectory()) {
             const entries = await fs.readdir(fullPath);
-            return res.send({ directory: fullPath, contents: entries });
+            return res.send(entries);
         } else {
             if (level === 'level_1') {
                 return res.status(403).send({ error: 'Just in level 1 you cannot read the flag file using the http protocol.' });
