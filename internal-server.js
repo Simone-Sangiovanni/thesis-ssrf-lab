@@ -11,6 +11,10 @@ const app = express();
 const statCache = new Map();
 const CACHE_TTL = 5000; // Keep cache entries for 5 seconds
 
+// credentials
+const username = 'alfred';
+const password = 'sCw2QA6H';
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -81,13 +85,30 @@ app.use(async (req, res, next) => {
             return res.send(entries);
         } else {
             if (level === 'level_1') {
-                return res.status(403).send({ error: 'Just in level 1 you cannot read the flag file using the http protocol.' });
+                return res.status(403).send('Just in level 1 you cannot read the flag file using the http protocol.');
+            }
+            if (level === 'level_7' || fullPath.includes('level_7')) {
+                let providedUsername = '';
+                let providedPassword = '';
+
+                if (req.headers.authorization && req.headers.authorization.startsWith('Basic ')) {
+                    const token = req.headers.authorization.split(' ')[1];
+                    const decoded = Buffer.from(token, 'base64').toString('ascii');
+                    const [user, pass] = decoded.split(':');
+                    providedUsername = user;
+                    providedPassword = pass;
+                }
+
+                // Validate credentials
+                if (providedUsername !== username || providedPassword !== password) {
+                    return res.status(401).send('Unauthorized: Invalid credentials for level_7');
+                }
             }
             if (fullPath.includes(level)) {
                 const content = await fs.readFile(fullPath, 'utf8');
                 return res.send(content);
             } else {
-                return res.status(403).send({ error: `You cannot read this flag: "${fullPath}".` });
+                return res.status(403).send(`You cannot read this flag: ${fullPath}.` );
             }
         }
     } catch (err) {
