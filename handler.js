@@ -37,48 +37,48 @@ const protocolHandlers = {
  * @throws {Error} On network failure, missing config file, etc.
  */
 async function handleURL(url, level, config) {
-  console.log(`\n${'─'.repeat(60)}`);
-  console.log(`[handleURL] url="${url}"  level="${level}"`);
+  	console.log(`\n${'─'.repeat(60)}`);
+  	console.log(`[handleURL] url="${url}"  level="${level}"`);
 
-  // ── 1. Load level config ─────────────────────────────────────────────────
-  console.log(`[handleURL] pipeline: [${config.pipeline.join(', ')}]`);
+  	// ── 1. Load level config ─────────────────────────────────────────────────
+  	console.log(`[handleURL] pipeline: [${config.pipeline.join(', ')}]`);
 
-  // ── 2. Parse the URL ─────────────────────────────────────────────────────
-  const parsedUrl = urlUtils.RFC3986_URLParser(url);
-  console.log(`[handleURL] parsed URL:`, parsedUrl);
+  	// ── 2. Parse the URL ─────────────────────────────────────────────────────
+  	const parsedUrl = urlUtils.RFC3986_URLParser(url);
+  	console.log(`[handleURL] parsed URL:`, parsedUrl);
 
-  if (!parsedUrl.scheme) {
-    throw new UrlError('URL has no scheme');
-  }
+  	if (!parsedUrl.scheme) {
+		throw new UrlError('URL has no scheme');
+  	}
 
-  // ── 3. Build shared, mutable context ────────────────────────────────────
-  //  Defenses receive this object and may mutate parsedUrl.authority and
-  //  authority.host / authority.port to normalise values for subsequent checks.
-  const authority = urlUtils.parseAuthority(parsedUrl.authority ?? ''); // ?? -> if parsedUrl.authority is 'null' or 'undefined' use an empty string
-  const ctx = { parsedUrl, authority };
-  console.log(`[handleUrl] context ctx: ${JSON.stringify(ctx, null, 2)}`);
+  	// ── 3. Build shared, mutable context ────────────────────────────────────
+  	//  Defenses receive this object and may mutate parsedUrl.authority and
+  	//  authority.host / authority.port to normalise values for subsequent checks.
+  	const authority = urlUtils.parseAuthority(parsedUrl.authority ?? ''); // ?? -> if parsedUrl.authority is 'null' or 'undefined' use an empty string
+  	const ctx = { parsedUrl, authority };
+  	console.log(`[handleUrl] context ctx: ${JSON.stringify(ctx, null, 2)}`);
 
-  // ── 4. Run defense pipeline ──────────────────────────────────────────────
-  for (const name of config.pipeline) {
-    const defense = defenses[name];
-    if (typeof defense !== 'function') {
-      throw new ConfigError(
-        `Unknown defense "${name}" in pipeline for level "${level}". ` +
-        `Available defenses: [${Object.keys(defenses).join(', ')}]`
-      );
-    }
-    console.log(`[pipeline] → ${name}`);
-    await defense(ctx, config); // throws BlockedError to halt
-  }
+  	// ── 4. Run defense pipeline ──────────────────────────────────────────────
+  	for (const name of config.pipeline) {
+		const defense = defenses[name];
+		if (typeof defense !== 'function') {
+		  throw new ConfigError(
+			`Unknown defense "${name}" in pipeline for level "${level}". ` +
+			`Available defenses: [${Object.keys(defenses).join(', ')}]`
+		  );
+		}
+		console.log(`[pipeline] → ${name}`);
+		await defense(ctx, config); // throws BlockedError to halt
+  	}
 
-  // ── 5. Dispatch to protocol handler ─────────────────────────────────────
-  const protocol_handler = protocolHandlers[parsedUrl.scheme];
-  if (!protocol_handler) {
-    // checkProtocol should have caught this; guard defensively
-    throw new BlockedError(`No handler registered for scheme "${parsedUrl.scheme}"`);
-  }
+  	// ── 5. Dispatch to protocol handler ─────────────────────────────────────
+  	const protocol_handler = protocolHandlers[parsedUrl.scheme];
+  	if (!protocol_handler) {
+		// checkProtocol should have caught this; guard defensively
+		throw new BlockedError(`No handler registered for scheme "${parsedUrl.scheme}"`);
+  	}
 
-  return protocol_handler(ctx, config, level);
-}
+  	return protocol_handler(ctx, config, level);
+}	
 
 module.exports = { handleURL };

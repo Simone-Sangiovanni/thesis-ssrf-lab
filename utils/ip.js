@@ -13,19 +13,19 @@ const ipaddr = require('ipaddr.js');
  * Throws if the host cannot be resolved.
  */
 async function resolveHost(host) {
-  const clean = stripBrackets(host);
+	const clean = stripBrackets(host);
 
-  // Direct IP parse (avoids unnecessary DNS round-trip)
-  try {
-    const parsed = ipaddr.parse(clean);
-    return { address: parsed.toString(), family: parsed.kind() };
-  } catch { /* not a bare IP string — fall through to DNS */ }
+	// Direct IP parse (avoids unnecessary DNS round-trip)
+	try {
+		const parsed = ipaddr.parse(clean);
+		return { address: parsed.toString(), family: parsed.kind() };
+	} catch { /* not a bare IP string — fall through to DNS */ }
 
-  const result = await dns.lookup(clean/*, { verbatim: true }*/);
-  return {
-    address: result.address,
-    family:  result.family === 4 ? 'ipv4' : 'ipv6',
-  };
+	const result = await dns.lookup(clean/*, { verbatim: true }*/);
+	return {
+		address: result.address,
+		family:  result.family === 4 ? 'ipv4' : 'ipv6',
+	};
 }
 
 /**
@@ -34,16 +34,16 @@ async function resolveHost(host) {
  * IPv4-mapped IPv6 loopback (::ffff:127.0.0.1).
  */
 function isLoopback(address) {
-  try {
-    const parsed = ipaddr.parse(address);
-    // Unwrap IPv4-mapped IPv6 before the range check
-    if (parsed.kind() === 'ipv6' && parsed.isIPv4MappedAddress()) {
-      return parsed.toIPv4Address().range() === 'loopback';
-    }
-    return parsed.range() === 'loopback';
-  } catch {
-    return false;
-  }
+	try {
+		const parsed = ipaddr.parse(address);
+		// Unwrap IPv4-mapped IPv6 before the range check
+		if (parsed.kind() === 'ipv6' && parsed.isIPv4MappedAddress()) {
+			return parsed.toIPv4Address().range() === 'loopback';
+		}
+		return parsed.range() === 'loopback';
+	} catch {
+		return false;
+	}
 }
 
 // ─── Alternate IPv4 representation normalisation ──────────────────────────────
@@ -56,20 +56,20 @@ function isLoopback(address) {
  * …to a JavaScript number, or NaN if it doesn't match any of these forms.
  */
 function parseIntPart(s) {
-  if (/^0[xX][0-9a-fA-F]+$/.test(s)) return parseInt(s, 16);
-  if (/^0[0-7]+$/.test(s)) return parseInt(s, 8);
-  if (/^\d+$/.test(s)) return parseInt(s, 10);
-  return NaN;
+	if (/^0[xX][0-9a-fA-F]+$/.test(s)) return parseInt(s, 16);
+	if (/^0[0-7]+$/.test(s)) return parseInt(s, 8);
+	if (/^\d+$/.test(s)) return parseInt(s, 10);
+	return NaN;
 }
 
 /** Converts a 32-bit unsigned integer to dotted-quad IPv4 notation. */
 function intToIPv4(n) {
-  return [
-    (n >>> 24) & 0xff,
-    (n >>> 16) & 0xff,
-    (n >>> 8) & 0xff,
-     n & 0xff,
-  ].join('.');
+	return [
+		(n >>> 24) & 0xff,
+		(n >>> 16) & 0xff,
+		(n >>> 8) & 0xff,
+		n & 0xff,
+	].join('.');
 }
 
 /**
@@ -87,25 +87,25 @@ function intToIPv4(n) {
  * Does NOT touch IPv6 addresses.
  */
 function normalizeIpRepresentation(host) {
-  // Skip IPv6 addresses (they contain colons or brackets)
-  if (host.includes(':') || host.startsWith('[')) return host;
+	// Skip IPv6 addresses (they contain colons or brackets)
+	if (host.includes(':') || host.startsWith('[')) return host;
 
-  // ── Single-part integer (decimal, hex, or octal) ──────────────────────────
-  if (/^(0[xX][0-9a-fA-F]+|0[0-7]+|\d+)$/.test(host)) {
-    const n = parseIntPart(host);
-    if (!isNaN(n) && n >= 0 && n <= 0xffffffff) return intToIPv4(n);
-  }
+	// ── Single-part integer (decimal, hex, or octal) ──────────────────────────
+	if (/^(0[xX][0-9a-fA-F]+|0[0-7]+|\d+)$/.test(host)) {
+		const n = parseIntPart(host);
+		if (!isNaN(n) && n >= 0 && n <= 0xffffffff) return intToIPv4(n);
+	}
 
-  // ── Dotted four-part form (each octet may be dec/hex/oct) ─────────────────
-  const parts = host.split('.');
-  if (parts.length === 4) {
-    const octets = parts.map(parseIntPart);
-    if (octets.every(o => !isNaN(o) && o >= 0 && o <= 255)) {
-      return octets.join('.');
-    }
-  }
+	// ── Dotted four-part form (each octet may be dec/hex/oct) ─────────────────
+	const parts = host.split('.');
+	if (parts.length === 4) {
+		const octets = parts.map(parseIntPart);
+		if (octets.every(o => !isNaN(o) && o >= 0 && o <= 255)) {
+			return octets.join('.');
+		}
+	}
 
-  return host; // unchanged
+	return host; // unchanged
 }
 
 /**
@@ -117,26 +117,26 @@ function normalizeIpRepresentation(host) {
  * blocked IPv4 address.
  */
 function extractIpv4FromMappedIpv6(host) {
-  try {
-    const parsed = ipaddr.parse(stripBrackets(host));
-    if (parsed.kind() === 'ipv6' && parsed.isIPv4MappedAddress()) {
-      return parsed.toIPv4Address().toString();
-    }
-  } catch { /* not a parseable IP */ }
-  return host;
+	try {
+		const parsed = ipaddr.parse(stripBrackets(host));
+		if (parsed.kind() === 'ipv6' && parsed.isIPv4MappedAddress()) {
+			return parsed.toIPv4Address().toString();
+		}
+	} catch { /* not a parseable IP */ }
+	return host;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function stripBrackets(host) {
-  return host.startsWith('[') && host.endsWith(']')
-    ? host.slice(1, -1)
-    : host;
+	return host.startsWith('[') && host.endsWith(']')
+		? host.slice(1, -1)
+		: host;
 }
 
 module.exports = {
-  resolveHost,
-  isLoopback,
-  normalizeIpRepresentation,
-  extractIpv4FromMappedIpv6,
+  	resolveHost,
+  	isLoopback,
+  	normalizeIpRepresentation,
+  	extractIpv4FromMappedIpv6,
 };

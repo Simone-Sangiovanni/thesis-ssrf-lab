@@ -19,61 +19,61 @@ const urlUtils = require('../utils/url_utils');
  * @returns {Promise<string>} Response body text.
  */
 async function httpHandler({ parsedUrl, authority }, _config, level) {
-  // Rebuild the authority from the (possibly normalised) authority object
-  // so the outgoing URL reflects any changes made by defenses.
-  const rebuiltAuthority = urlUtils.buildAuthority(authority);
-  console.log(`[httpHandler] Rebuilt authority: ${JSON.stringify(rebuiltAuthority, null, 2)}`);
-  const outgoingUrl = urlUtils.rebuildUrl({
-    ...parsedUrl, // ... -> spread operator: copy all the properies of parsedUrl into the newly created object
-    authority: rebuiltAuthority, // but substitute the autority field with the rebuilt authority
-  });
-  console.log(`[httpHandler] → ${outgoingUrl}`);
+    // Rebuild the authority from the (possibly normalised) authority object
+    // so the outgoing URL reflects any changes made by defenses.
+    const rebuiltAuthority = urlUtils.buildAuthority(authority);
+    console.log(`[httpHandler] Rebuilt authority: ${JSON.stringify(rebuiltAuthority, null, 2)}`);
+    const outgoingUrl = urlUtils.rebuildUrl({
+        ...parsedUrl, // ... -> spread operator: copy all the properies of parsedUrl into the newly created object
+        authority: rebuiltAuthority, // but substitute the autority field with the rebuilt authority
+    });
+    console.log(`[httpHandler] → ${outgoingUrl}`);
 
-  // ── Loopback detection (best-effort) ───────────────────────────────────────
-  // We try to resolve the host in ctx.authority (which has been normalised by
-  // defenses). On levels where encoding bypasses are in play the host string
-  // may still be percent-encoded here; in that case resolution will fail and
-  // we simply skip the header — the request still goes through.
-  let targetIsLoopback = false;
-  try { 
-    console.log(`[httpHandler] authority.host: ${authority.host}`);
-    const host = decodeURIComponent(authority.host);
-    console.log(`[httpHandler] host: ${host}`);
-    const resolved = await ipUtils.resolveHost(host);
-    console.log(`[httpHandler] resolved host: ${JSON.stringify(resolved, null, 2)}`);
-    targetIsLoopback = ipUtils.isLoopback(resolved.address);
-    console.log(`[httpHandler] is loopback address? ${targetIsLoopback}`);
-  } catch {
-    // Non-critical: resolveHost can fail for encoded/synthetic addresses.
-    // The outgoing fetch will still work because Node's WHATWG URL parser
-    // decodes percent-encoding internally.
-  }
+    // ── Loopback detection (best-effort) ───────────────────────────────────────
+    // We try to resolve the host in ctx.authority (which has been normalised by
+    // defenses). On levels where encoding bypasses are in play the host string
+    // may still be percent-encoded here; in that case resolution will fail and
+    // we simply skip the header — the request still goes through.
+    let targetIsLoopback = false;
+    try { 
+        console.log(`[httpHandler] authority.host: ${authority.host}`);
+        const host = decodeURIComponent(authority.host);
+        console.log(`[httpHandler] host: ${host}`);
+        const resolved = await ipUtils.resolveHost(host);
+        console.log(`[httpHandler] resolved host: ${JSON.stringify(resolved, null, 2)}`);
+        targetIsLoopback = ipUtils.isLoopback(resolved.address);
+        console.log(`[httpHandler] is loopback address? ${targetIsLoopback}`);
+    } catch {
+        // Non-critical: resolveHost can fail for encoded/synthetic addresses.
+        // The outgoing fetch will still work because Node's WHATWG URL parser
+        // decodes percent-encoding internally.
+    }
 
-  const fetchOptions = targetIsLoopback ? { 
-        headers: { 
-            'X-Current-Level': level,
-            'Authorization': 'Basic ' + Buffer.from(`${authority.username}:${authority.password}`).toString(),
-        } 
-    } : {};
-  console.log(`fetch options: ${JSON.stringify(fetchOptions, null, 2)}`);
+    const fetchOptions = targetIsLoopback ? { 
+          headers: { 
+              'X-Current-Level': level,
+              'Authorization': 'Basic ' + Buffer.from(`${authority.username}:${authority.password}`).toString(),
+          } 
+      } : {};
+    console.log(`fetch options: ${JSON.stringify(fetchOptions, null, 2)}`);
 
-  // ── Send the request ───────────────────────────────────────────────────────
-  let response;
-  try {
-    response = await fetch(outgoingUrl, fetchOptions);
-  } catch (err) {
-    // Surface connection errors (e.g. ECONNREFUSED on wrong port) so that
-    // students can distinguish a closed port from an open one during port
-    // scanning in level 6.
-    throw new Error(`Connection failed: ${err.message}`);
-  }
+    // ── Send the request ───────────────────────────────────────────────────────
+    let response;
+    try {
+        response = await fetch(outgoingUrl, fetchOptions);
+    } catch (err) {
+        // Surface connection errors (e.g. ECONNREFUSED on wrong port) so that
+        // students can distinguish a closed port from an open one during port
+        // scanning in level 6.
+        throw new Error(`Connection failed: ${err.message}`);
+    }
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => response.statusText);
-    throw new Error(`Upstream error - ${response.status}: ${detail}`);
-  }
+    if (!response.ok) {
+        const detail = await response.text().catch(() => response.statusText);
+        throw new Error(`Upstream error - ${response.status}: ${detail}`);
+    }
 
-  return response.text();
+    return response.text();
 }
 
 module.exports = httpHandler;

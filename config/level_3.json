@@ -1,17 +1,17 @@
 {
-  "_comment": [
-    "Level 3 — Localhost blacklisted; no decoding before the check.",
-    "The blacklist compares the raw (still percent-encoded) authority",
-    "string, so URL-encoding the host bypasses it.",
-    "Bypass: http://%31%32%37%2e%30%2e%30%2e%31/ (127.0.0.1 encoded).",
-    "Node's WHATWG fetch decodes the host before connecting."
-  ],
-  "pipeline": [
-    "checkProtocol",
-    "checkHostBlacklist"
-  ],
-  "allowedProtocols": ["http", "https"],
-  "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
-  "fileWhitelist": ["/flags/level_3"],
-  "randomPort": false
+	"_comment": [
+		"Level 3 — Localhost blacklisted; no decoding before the check.",
+		"The blacklist compares the raw (still percent-encoded) authority",
+		"string, so URL-encoding the host bypasses it.",
+		"Bypass: http://%31%32%37%2e%30%2e%30%2e%31/ (127.0.0.1 encoded).",
+		"Node's WHATWG fetch decodes the host before connecting."
+	],
+	"pipeline": [
+		"checkProtocol",
+		"checkHostBlacklist"
+	],
+	"allowedProtocols": ["http", "https"],
+	"hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
+	"fileWhitelist": ["/flags/level_3"],
+	"randomPort": false
 }
