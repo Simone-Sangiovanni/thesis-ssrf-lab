@@ -49,10 +49,13 @@ async function httpHandler({ parsedUrl, authority }, _config, level) {
         // decodes percent-encoding internally.
     }
 
+    const cleanUrl = urlUtils.stripCredentials(outgoingUrl);
+    console.log(`clean url: ${cleanUrl}`);
+
     const fetchOptions = targetIsLoopback ? { 
           headers: { 
               'X-Current-Level': level,
-              'Authorization': 'Basic ' + Buffer.from(`${authority.username}:${authority.password}`).toString(),
+              'Authorization': 'Basic ' + Buffer.from(`${authority.username}:${authority.password}`).toString('base64'),
           } 
       } : {};
     console.log(`fetch options: ${JSON.stringify(fetchOptions, null, 2)}`);
@@ -60,7 +63,7 @@ async function httpHandler({ parsedUrl, authority }, _config, level) {
     // ── Send the request ───────────────────────────────────────────────────────
     let response;
     try {
-        response = await fetch(outgoingUrl, fetchOptions);
+        response = await fetch(cleanUrl, fetchOptions);
     } catch (err) {
         // Surface connection errors (e.g. ECONNREFUSED on wrong port) so that
         // students can distinguish a closed port from an open one during port
