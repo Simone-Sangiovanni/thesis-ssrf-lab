@@ -130,4 +130,33 @@ function rebuildUrl({ scheme, authority, path, query, fragment }) {
     return url;
 }
 
-module.exports = { RFC3986_URLParser, parseAuthority, buildAuthority, rebuildUrl };
+/**
+ * Removes credentials (username:password) from a URL string.
+ * Works with both IPv4 and IPv6 addresses, as well as hostnames.
+ * Uses the WHATWG URL API, which is available in Node.js and modern browsers.
+ *
+ * @param {string} url - The URL to clean (e.g., 'http://alfred:qwert@127.0.0.1/secretPath')
+ * @returns {string} - The same URL without any credentials, or the original if parsing fails.
+ */
+function stripCredentials(url) {
+    try {
+        // Attempt to parse the URL. The constructor works for absolute URLs with a scheme.
+        const urlObj = new URL(url);
+        
+        // If either username or password is present, clear both.
+        if (urlObj.username || urlObj.password) {
+            urlObj.username = '';
+            urlObj.password = '';
+            return urlObj.toString();
+        }
+        // No credentials to strip
+        return url;
+    } catch {
+        // If the URL is malformed or relative, return it unchanged.
+        // In practice, you might also try to prefix a dummy scheme, but the problem
+        // context expects valid absolute URLs (e.g., from an HTTP request line).
+        return url;
+    }
+}
+
+module.exports = { RFC3986_URLParser, parseAuthority, buildAuthority, rebuildUrl, stripCredentials };
