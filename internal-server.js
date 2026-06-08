@@ -81,7 +81,7 @@ app.use(async (req, res, next) => {
     
     try {
         if (stat.isDirectory()) {
-            const entries = await fs.readdir(fullPath);
+            const entries = await fs.readdir(fullPath, 'utf8');
             return res.send(entries);
         } else {
             if (level === 'level_1') {
