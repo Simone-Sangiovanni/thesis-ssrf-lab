@@ -17,7 +17,7 @@
     "checkHostBlacklist"
   ],
   "allowedProtocols": ["http", "https"],
-  "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
+  "hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "[::1]"],
   "fileWhitelist": ["/flags/level_4"],
   "randomPort": false
 }
