@@ -1,0 +1,3 @@
+split level 7
+
+add hint in level 6 and 7
