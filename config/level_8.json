@@ -33,6 +33,6 @@
 	],
 	"allowedProtocols": ["http", "https"],
 	"hostBlacklist": ["127.0.0.1", "localhost", "0.0.0.0", "::1"],
-	"fileWhitelist": ["/etc/hidden/flags/level_7"],
+	"fileWhitelist": ["/flags/level_8"],
 	"randomPort": true
 }

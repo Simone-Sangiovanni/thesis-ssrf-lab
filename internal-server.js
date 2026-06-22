@@ -45,8 +45,16 @@ app.get('/', async (req, res, next) => {
 
 
 app.get('/secretPath', async (req, res, next) => {
+    const level = req.headers['x-current-level'];
+    if (!level || !VALID_LEVELS.includes(level)) {
+        return res.status(403).send({ error: 'Missing or invalid X-Current-Level header' });
+    }
     try {
-        return res.send({ env: process.env });
+        if (level === "level_7") {
+            return res.send({ flag_path: "/etc/hidden/flags/level_7" });
+        } else if (level === "level_8") {
+            return res.send({ env: process.env });
+        }
     } catch (err) {
         next(err);
     }
@@ -87,7 +95,7 @@ app.use(async (req, res, next) => {
             if (level === 'level_1') {
                 return res.status(403).send('Just in level 1 you cannot read the flag file using the http protocol.');
             }
-            if (level === 'level_7' || fullPath.includes('level_7')) {
+            if (level === 'level_8' || fullPath.includes('level_8')) {
                 let providedUsername = '';
                 let providedPassword = '';
 

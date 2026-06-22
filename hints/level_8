@@ -1,0 +1,4 @@
+The internal server expose a secret path that shows interesting informations to solve the level
+
+NOTE:
+Ports are limited between 5000 and 25000 to simplify port scanning
