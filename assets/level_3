@@ -1,1 +1,1 @@
-flag{buffer_overflow}
+flag{double_encoding}
